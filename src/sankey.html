@@ -50,13 +50,13 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 </head>
 <body>
+<script src="js/daterange-picker.js"></script>
 <nav style="background:#0c111b;padding:0 28px;display:flex;align-items:center;border-bottom:1px solid #1e293b;font-family:'DM Sans',-apple-system,sans-serif;font-size:13px;height:44px;gap:0;">
 <a href="index.html" style="color:#475569;text-decoration:none;font-weight:600;padding:0 14px 0 0;border-right:1px solid #1e293b;margin-right:4px;display:flex;align-items:center;gap:4px;height:100%;">
 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Hub</a>
 <a href="dashboard.html" class="nav-link" id="nav-dashboard" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Dashboard</a>
 <a href="explorer.html" class="nav-link" id="nav-explorer" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Explorer</a>
 <a href="sankey.html" class="nav-link" id="nav-sankey" style="color:#f1f5f9;text-decoration:none;padding:10px 14px;border-bottom:2px solid #3b82f6;font-weight:600;display:flex;align-items:center;gap:5px;height:100%;">Sankey</a>
-<a href="migration.html" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Migración</a>
 <a href="insights.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Insights</a>
 <a href="curves.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Curvas</a>
 <a href="benchmark.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Benchmark</a>
@@ -70,10 +70,12 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 <div class="ctrl-bar">
     <div class="fg"><label>Modelo Return</label><select id="fFrom" onchange="render()"><option value="all">Todos</option></select></div>
     <div class="fg"><label>Modelo Purchase</label><select id="fTo" onchange="render()"><option value="all">Todos</option></select></div>
-    <div class="fg"><label>Desde</label><input type="date" id="fDS" onchange="render()"></div>
-    <div class="fg"><label>Hasta</label><input type="date" id="fDE" onchange="render()"></div>
+    <input type="hidden" id="fDS"><input type="hidden" id="fDE">
     <div class="fg"><label>Mín. Trade-Ins</label><input type="number" id="fMin" value="10" min="1" max="500" style="width:75px" onchange="render()"></div>
-    <div class="fg" style="justify-content:end"><button class="btn" onclick="resetF()">Reset</button></div>
+    <div class="fg" style="flex:1;justify-content:end;flex-direction:row;align-items:center;gap:10px">
+        <div id="sankeyDatePicker"></div>
+        <button class="btn" onclick="resetF()">Reset</button>
+    </div>
 </div>
 <div class="kpis">
     <div class="kp"><div class="l">Trade-Ins</div><div class="v" id="k1" style="color:var(--accent)">—</div></div>
@@ -99,37 +101,47 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 
 <script>
 let RAW = null;
-const PAL = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#a855f7','#e11d48','#0ea5e9','#d946ef','#22d3ee','#fb923c','#4ade80','#facc15','#818cf8','#fb7185','#2dd4bf','#fbbf24','#a78bfa','#34d399','#f87171','#60a5fa','#c084fc'];
-const MC = {};
-const fmt = n => n.toLocaleString('es-CL');
-const fmtC = n => n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+Math.round(n/1e3)+'K':'$'+n;
 
 function initSankey() {
-    if (!RAW) return;
-    // Build model-color map
-    RAW.models.forEach((m,i) => MC[m] = PAL[i%PAL.length]);
-    // Populate filter selects
-    RAW.models.forEach(m => {
-        document.getElementById('fFrom').add(new Option(m,m));
-        document.getElementById('fTo').add(new Option(m,m));
-    });
-    document.getElementById('fDS').value='2023-07-01';
-    document.getElementById('fDE').value=RAW.dateMax;
-    render();
+    if (RAW) {
+        render();
+    }
 }
 
 fetch('data/processed/sankey.json')
     .then(r => r.json())
     .then(d => { RAW = d; initSankey(); })
     .catch(e => console.error('Data load error:', e));
+const PAL = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#a855f7','#e11d48','#0ea5e9','#d946ef','#22d3ee','#fb923c','#4ade80','#facc15','#818cf8','#fb7185','#2dd4bf','#fbbf24','#a78bfa','#34d399','#f87171','#60a5fa','#c084fc'];
+const MC = {}; RAW.models.forEach((m,i) => MC[m] = PAL[i%PAL.length]);
+const fmt = n => n.toLocaleString('es-CL');
+const fmtC = n => n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+Math.round(n/1e3)+'K':'$'+n;
+
+// Populate
+RAW.models.forEach(m => {
+    document.getElementById('fFrom').add(new Option(m,m));
+    document.getElementById('fTo').add(new Option(m,m));
+});
+document.getElementById('fDS').value='2023-07-01';
+document.getElementById('fDE').value=RAW.dateMax;
+window.sankeyPicker = new DateRangePicker({
+    containerId: 'sankeyDatePicker',
+    dateMin: '2023-07-01',
+    dateMax: RAW.dateMax,
+    onChange: function(start, end) {
+        document.getElementById('fDS').value = start;
+        document.getElementById('fDE').value = end;
+        render();
+    }
+});
 
 function resetF(){
-    if (!RAW) return;
     document.getElementById('fFrom').value='all';
     document.getElementById('fTo').value='all';
     document.getElementById('fDS').value='2023-07-01';
     document.getElementById('fDE').value=RAW.dateMax;
     document.getElementById('fMin').value=10;
+    if (window.sankeyPicker) window.sankeyPicker.setRange('2023-07-01', RAW.dateMax);
     render();
 }
 
@@ -506,7 +518,7 @@ document.addEventListener('mouseleave',function(e){
 },true);
 
 // Initialization moved to fetch handler above
-window.addEventListener('resize', function(){ if(RAW) render(); });
+window.addEventListener('resize',render);
 </script>
 </body>
 </html>

@@ -81,6 +81,7 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 </head>
 <body>
+<script src="js/daterange-picker.js"></script>
 <nav style="background:#0c111b;padding:0 28px;display:flex;align-items:center;border-bottom:1px solid #1e293b;font-family:'DM Sans',-apple-system,sans-serif;font-size:13px;height:44px;gap:0;">
 <a href="index.html" style="color:#475569;text-decoration:none;font-weight:600;padding:0 14px 0 0;border-right:1px solid #1e293b;margin-right:4px;display:flex;align-items:center;gap:4px;height:100%;">
 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Hub</a>
@@ -99,9 +100,11 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
     <p id="subtitle">Flujo completo: de qué iPhone vienen → a qué iPhone compran (en % por fila)</p>
 </div>
 <div class="ctrl-bar">
-    <div class="fg"><label>Desde</label><input type="date" id="fDS" onchange="render()"></div>
-    <div class="fg"><label>Hasta</label><input type="date" id="fDE" onchange="render()"></div>
-    <div class="fg" style="justify-content:end"><button class="btn" onclick="resetF()">Reset</button></div>
+    <input type="hidden" id="fDS"><input type="hidden" id="fDE">
+    <div class="fg" style="flex:1;justify-content:end;flex-direction:row;align-items:center;gap:10px">
+        <div id="migrationDatePicker"></div>
+        <button class="btn" onclick="resetF()">Reset</button>
+    </div>
 </div>
 
 <div class="kpis">
@@ -152,6 +155,16 @@ function initMigration() {
     if (!RAW) return;
     document.getElementById('fDS').value = RAW.dateMin;
     document.getElementById('fDE').value = RAW.dateMax;
+    window.migrationPicker = new DateRangePicker({
+        containerId: 'migrationDatePicker',
+        dateMin: RAW.dateMin,
+        dateMax: RAW.dateMax,
+        onChange: function(start, end) {
+            document.getElementById('fDS').value = start;
+            document.getElementById('fDE').value = end;
+            render();
+        }
+    });
     render();
 }
 
@@ -159,6 +172,7 @@ function resetF() {
     if (!RAW) return;
     document.getElementById('fDS').value = RAW.dateMin;
     document.getElementById('fDE').value = RAW.dateMax;
+    if (window.migrationPicker) window.migrationPicker.setRange(RAW.dateMin, RAW.dateMax);
     render();
 }
 

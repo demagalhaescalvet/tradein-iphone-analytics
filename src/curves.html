@@ -56,12 +56,12 @@ nav .back { padding:0 14px 0 0; border-right:1px solid var(--border); margin-rig
 </style>
 </head>
 <body>
+<script src="js/daterange-picker.js"></script>
 <nav>
 <a href="index.html" class="back"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Hub</a>
 <a href="dashboard.html">Dashboard</a>
 <a href="explorer.html">Explorer</a>
 <a href="sankey.html">Sankey</a>
-<a href="migration.html">Migración</a>
 <a href="insights.html">Insights</a>
 <a href="curves.html" class="active">Curvas</a>
 <a href="benchmark.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Benchmark</a>
@@ -82,9 +82,11 @@ nav .back { padding:0 14px 0 0; border-right:1px solid var(--border); margin-rig
             <option value="Grado B">Solo Grado B</option>
         </select>
     </div>
-    <div class="fg"><label>Desde</label><input type="date" id="fDS" onchange="render()" oninput="render()"></div>
-    <div class="fg"><label>Hasta</label><input type="date" id="fDE" onchange="render()" oninput="render()"></div>
-    <div class="fg" style="justify-content:end"><button class="btn" onclick="resetF()">Reset</button></div>
+    <input type="hidden" id="fDS"><input type="hidden" id="fDE">
+    <div class="fg" style="flex:1;justify-content:end;flex-direction:row;align-items:center;gap:10px">
+        <div id="curvesDatePicker"></div>
+        <button class="btn" onclick="resetF()">Reset</button>
+    </div>
 </div>
 
 <div class="kpis">
@@ -134,11 +136,11 @@ const fmt=n=>n.toLocaleString('es-CL');
 const fmtC=n=>n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+Math.round(n/1e3)+'K':'$'+n;
 
 function resetF(){
-  if (!RAW) return;
   document.getElementById('fModel').value='iPhone 13';
   document.getElementById('fGrade').value='both';
   document.getElementById('fDS').value=RAW.dateMin;
   document.getElementById('fDE').value=RAW.dateMax;
+  if (window.curvesPicker) window.curvesPicker.setRange(RAW.dateMin, RAW.dateMax);
   render();
 }
 
@@ -490,7 +492,7 @@ function renderSpreadChart(){
   });
   const spreadMonths=Object.keys(spreadByMonth).sort();
   const spreadData=spreadMonths.map(m=>{
-    const a=spreadByMonth[m]['Grado A'], b=spreadByMonth[m]['Grado B'];
+    const a=spreadByMonth[m]['GRADO A'], b=spreadByMonth[m]['GRADO B'];
     return {x:m, y:(a&&b)?a-b:null};
   }).filter(d=>d.y!==null);
 
@@ -662,7 +664,6 @@ function renderCorrTable(){
 }
 
 function render(){
-  if (!RAW) return;
   const model=document.getElementById('fModel').value;
   const grade=document.getElementById('fGrade').value;
 
@@ -706,7 +707,7 @@ function render(){
   });
   const spreadMonths=Object.keys(spreadByMonth).sort();
   const spreadVals=spreadMonths.map(m=>{
-    const a=spreadByMonth[m]['Grado A'], b=spreadByMonth[m]['Grado B'];
+    const a=spreadByMonth[m]['GRADO A'], b=spreadByMonth[m]['GRADO B'];
     return(a&&b)?a-b:null;
   }).filter(v=>v!==null);
 
@@ -751,14 +752,24 @@ function initCurves() {
   document.getElementById('fDS').value=RAW.dateMin;
   document.getElementById('fDE').value=RAW.dateMax;
 
+  window.curvesPicker = new DateRangePicker({
+    containerId: 'curvesDatePicker',
+    dateMin: RAW.dateMin,
+    dateMax: RAW.dateMax,
+    onChange: function(start, end) {
+      document.getElementById('fDS').value = start;
+      document.getElementById('fDE').value = end;
+      render();
+    }
+  });
+
   render();
 
-  // Ensure date changes trigger re-render
-  ['fDS', 'fDE', 'fModel', 'fGrade'].forEach(id => {
+  // Ensure model/grade changes trigger re-render
+  ['fModel', 'fGrade'].forEach(id => {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener('change', render);
-      el.addEventListener('input', render);
     }
   });
 }

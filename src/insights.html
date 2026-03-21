@@ -55,22 +55,23 @@ svg { display:block; margin:0 auto; }
 </style>
 </head>
 <body>
+<script src="js/daterange-picker.js"></script>
 
 <nav>
 <span class="back">←</span>
-<a href='dashboard.html' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Dashboard</a>
-<a href="sankey.html" style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Sankey</a>
-<a href="migration.html" style='color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Migración</a>
-<a class='active' href='insights.html' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Insights</a>
-<a href='benchmark.html' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Benchmark</a>
+<a href='/' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Dashboard</a>
+<a class='active' href='/insights' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Insights</a>
+<a href='/benchmark' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Benchmark</a>
 <a href="elasticity.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
 </nav>
 
 <div class="hdr"><div><h1>Insights Avanzados</h1><p id="statusLabel">Análisis profundo del programa Trade-In</p></div></div>
 <div class="filters">
-    <div class="fg"><label>Desde</label><input type="date" id="fDS" onchange="render()"></div>
-    <div class="fg"><label>Hasta</label><input type="date" id="fDE" onchange="render()"></div>
-    <div class="fg" style="justify-content:end"><button class="btn" onclick="resetF()">Reset</button></div>
+    <input type="hidden" id="fDS"><input type="hidden" id="fDE">
+    <div class="fg" style="flex:1;justify-content:end;flex-direction:row;align-items:center;gap:10px">
+        <div id="insightsDatePicker"></div>
+        <button class="btn" onclick="resetF()">Reset</button>
+    </div>
 </div>
 
 <div class="kpis">
@@ -122,9 +123,9 @@ const fmt = n => n.toLocaleString('es-CL');
 const fmtC = n => n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+Math.round(n/1e3)+'K':'$'+n;
 
 function resetF() {
-    if (!RAW) return;
     document.getElementById('fDS').value = RAW.dateMin;
     document.getElementById('fDE').value = RAW.dateMax;
+    if (window.insightsPicker) window.insightsPicker.setRange(RAW.dateMin, RAW.dateMax);
     render();
 }
 
@@ -135,7 +136,6 @@ function ymInRange(ym) {
 }
 
 function render() {
-    if (!RAW) return;
     const filtered = {
         gen: RAW.gen.filter(d => ymInRange(d.ym)),
         tier: RAW.tier.filter(d => ymInRange(d.ym)),
@@ -167,9 +167,9 @@ function updateKPIs(filtered) {
     document.getElementById('kTier').textContent = tierTotal ? ((tierUp/tierTotal)*100).toFixed(1)+'%' : '—';
 
     // Cap upgrade %
-    const capAgg = {Same:0,Upgrade:0,Downgrade:0};
+    const capAgg = {Mismo:0,Upgrade:0,Downgrade:0};
     filtered.cap.forEach(d => { capAgg[d.change] = (capAgg[d.change]||0) + d.count; });
-    const capTotal = capAgg.Same + capAgg.Upgrade + capAgg.Downgrade;
+    const capTotal = capAgg.Mismo + capAgg.Upgrade + capAgg.Downgrade;
     document.getElementById('kCap').textContent = capTotal ? ((capAgg.Upgrade/capTotal)*100).toFixed(1)+'%' : '—';
 
     // Retention avg
@@ -179,10 +179,10 @@ function updateKPIs(filtered) {
     // Grade premium
     const byGrade = {A:0, B:0};
     filtered.grade.forEach(d => {
-        byGrade[d.from_grading_clean === 'Grado A' ? 'A' : 'B'] += d.avg_val * d.count;
+        byGrade[d.from_grading_clean === 'GRADO A' ? 'A' : 'B'] += d.avg_val * d.count;
     });
-    const gradeCountA = filtered.grade.filter(d=>d.from_grading_clean==='Grado A').reduce((s,d)=>s+d.count,0);
-    const gradeCountB = filtered.grade.filter(d=>d.from_grading_clean==='Grado B').reduce((s,d)=>s+d.count,0);
+    const gradeCountA = filtered.grade.filter(d=>d.from_grading_clean==='GRADO A').reduce((s,d)=>s+d.count,0);
+    const gradeCountB = filtered.grade.filter(d=>d.from_grading_clean==='GRADO B').reduce((s,d)=>s+d.count,0);
     const gradePrem = (gradeCountA && gradeCountB) ? (((byGrade.A/gradeCountA)/(byGrade.B/gradeCountB))-1)*100 : 0;
     document.getElementById('kGrade').textContent = gradePrem.toFixed(1)+'%';
 
@@ -416,12 +416,12 @@ function renderTier(data) {
 function renderCap(data) {
     d3.select('#capChart').selectAll('svg').remove();
     
-    const capAgg = {Same: 0, Upgrade: 0, Downgrade: 0};
+    const capAgg = {Mismo: 0, Upgrade: 0, Downgrade: 0};
     data.forEach(d => {
         capAgg[d.change] = (capAgg[d.change] || 0) + d.count;
     });
 
-    const total = capAgg.Same + capAgg.Upgrade + capAgg.Downgrade;
+    const total = capAgg.Mismo + capAgg.Upgrade + capAgg.Downgrade;
     if (total === 0) return;
 
     const waffleSize = 10;
@@ -451,7 +451,7 @@ function renderCap(data) {
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    const catColor = {Same: colors.accent, Upgrade: colors.green, Downgrade: colors.red};
+    const catColor = {Mismo: colors.accent, Upgrade: colors.green, Downgrade: colors.red};
 
     g.selectAll('.waffle-cell')
         .data(waffleData)
@@ -467,7 +467,7 @@ function renderCap(data) {
 
     // Legend
     const legend = svg.append('g').attr('transform', `translate(${margin.left},${margin.top + height + 20})`);
-    const cats = ['Same', 'Upgrade', 'Downgrade'];
+    const cats = ['Mismo', 'Upgrade', 'Downgrade'];
     cats.forEach((cat, i) => {
         const x = i * 150;
         legend.append('rect')
@@ -593,8 +593,8 @@ function renderGrade(data) {
         byModel[r.from_model][r.from_grading_clean].sum += r.avg_val*r.count;
         byModel[r.from_model][r.from_grading_clean].count += r.count;
     });
-    const models = Object.keys(byModel).filter(m => byModel[m]['Grado A']&&byModel[m]['Grado B']&&(byModel[m]['Grado A'].count+byModel[m]['Grado B'].count)>30)
-        .map(m => ({model:m, a:byModel[m]['Grado A'].sum/byModel[m]['Grado A'].count, b:byModel[m]['Grado B'].sum/byModel[m]['Grado B'].count, countA:byModel[m]['Grado A'].count, countB:byModel[m]['Grado B'].count}))
+    const models = Object.keys(byModel).filter(m => byModel[m]['GRADO A']&&byModel[m]['GRADO B']&&(byModel[m]['GRADO A'].count+byModel[m]['GRADO B'].count)>30)
+        .map(m => ({model:m, a:byModel[m]['GRADO A'].sum/byModel[m]['GRADO A'].count, b:byModel[m]['GRADO B'].sum/byModel[m]['GRADO B'].count, countA:byModel[m]['GRADO A'].count, countB:byModel[m]['GRADO B'].count}))
         .sort((a,b)=>(b.a-b.b)-(a.a-a.b)).slice(0,12);
 
     if (models.length === 0) return;
@@ -885,6 +885,16 @@ function renderLeakRate(data) {
 function initInsights() {
     document.getElementById('fDS').value = RAW.dateMin;
     document.getElementById('fDE').value = RAW.dateMax;
+    window.insightsPicker = new DateRangePicker({
+        containerId: 'insightsDatePicker',
+        dateMin: RAW.dateMin,
+        dateMax: RAW.dateMax,
+        onChange: function(start, end) {
+            document.getElementById('fDS').value = start;
+            document.getElementById('fDE').value = end;
+            render();
+        }
+    });
     render();
 }
 </script>
