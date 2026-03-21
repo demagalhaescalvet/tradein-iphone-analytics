@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Elasticidad — Trade-In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --bg: #0c111b;
+      --card: #141b2b;
+      --border: #1e293b;
+      --t1: #f1f5f9;
+      --t2: #cbd5e1;
+      --t3: #94a3b8;
+      --accent: #3b82f6;
+      --green: #10b981;
+      --red: #ef4444;
+      --amber: #f59e0b;
+      --purple: #a855f7;
+    }
+    body { background:var(--bg); color:var(--t1); font-family:'DM Sans',sans-serif; line-height:1.5; }
+    a { color:var(--accent); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+
+    nav {
+      background:var(--bg);
+      padding:0 28px;
+      display:flex;
+      align-items:center;
+      border-bottom:1px solid var(--border);
+      font-size:13px;
+      height:44px;
+      gap:0;
+    }
+    nav a {
+      color:var(--t3);
+      text-decoration:none;
+      padding:10px 14px;
+      border-bottom:2px solid transparent;
+      display:flex;
+      align-items:center;
+      height:100%;
+      transition:color 0.2s;
+    }
+    nav a.active {
+      color:var(--t1);
+      border-bottom-color:var(--accent);
+      font-weight:600;
+    }
+    nav a:hover { color:var(--t1); }
+    nav .back {
+      padding:0 14px 0 0;
+      border-right:1px solid var(--border);
+      margin-right:4px;
+      font-weight:600;
+      cursor:pointer;
+    }
+
+    .hdr { padding:20px 28px 0; display:flex; justify-content:space-between; align-items:end; flex-wrap:wrap; gap:16px; }
+    .hdr h1 { font-size:22px; font-weight:700; margin-bottom:4px; }
+    .hdr p { color:var(--t2); font-size:13px; }
+
+    .filters { display:flex; gap:12px; align-items:end; flex-wrap:wrap; padding:12px 28px 16px; }
+    .fg { display:flex; flex-direction:column; gap:3px; }
+    .fg label { font-size:10px; color:var(--t3); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+    .fg select {
+      padding:7px 10px;
+      border:1px solid var(--border);
+      border-radius:7px;
+      background:var(--card);
+      color:var(--t1);
+      font-size:13px;
+      cursor:pointer;
+      font-family:'DM Sans',sans-serif;
+    }
+    .fg select:hover { border-color:var(--accent); }
+
+    .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; padding:0 28px 20px; }
+    .kp {
+      background:var(--card);
+      padding:16px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      transition:border-color 0.2s;
+    }
+    .kp:hover { border-color:var(--accent); }
+    .kp .l { font-size:11px; color:var(--t2); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+    .kp .v { font-size:24px; font-weight:700; margin:6px 0; }
+    .kp .s { font-size:11px; color:var(--t3); }
+
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(500px,1fr)); gap:20px; padding:0 28px 28px; }
+    .grid .full { grid-column:1/-1; }
+    .card {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:18px;
+    }
+    .card h2 { font-size:14px; font-weight:600; color:var(--t1); margin-bottom:12px; }
+
+    svg { display:block; width:100%; height:auto; }
+    .axis { font-size:12px; }
+    .axis-label { font-size:11px; color:var(--t2); }
+    .grid-line { stroke:var(--border); stroke-dasharray:2,2; opacity:0.3; }
+
+    .scatter-dot { cursor:pointer; transition:r 0.2s; }
+    .scatter-dot.recent { opacity:1; }
+    .scatter-dot.old { opacity:0.5; }
+    .scatter-dot:hover { r:6px !important; }
+
+    .regression-line { stroke:var(--accent); stroke-width:2; fill:none; }
+
+    .quadrant-label {
+      font-size:11px;
+      color:var(--t3);
+      text-anchor:middle;
+      pointer-events:none;
+      font-weight:500;
+    }
+
+    .interpretation {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:18px;
+      grid-column:1/-1;
+    }
+    .interpretation h2 { font-size:14px; font-weight:600; margin-bottom:12px; }
+    .interpretation p { color:var(--t2); font-size:13px; line-height:1.6; }
+    .interpretation strong { color:var(--t1); font-weight:600; }
+
+    .bar-container { display:flex; align-items:center; gap:8px; }
+    .bar-label { min-width:120px; font-size:12px; color:var(--t2); }
+    .bar-value { font-size:11px; color:var(--t3); min-width:45px; }
+    .bar-sig { color:var(--accent); margin-left:4px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="back" onclick="window.history.back()">←</span>
+  <a href="/" style="color:#94a3b8;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Dashboard</a>
+  <a href="/insights" style="color:#94a3b8;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Insights</a>
+  <a href="/benchmark" style="color:#94a3b8;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Benchmark</a>
+  <a class="active" href="/elasticity" style="color:#94a3b8;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
+</nav>
+
+<div class="hdr">
+  <div>
+    <h1>Elasticidad de Precio-Volumen</h1>
+    <p>Cómo responde el volumen de trade-in a cambios en el precio de recompra</p>
+  </div>
+</div>
+
+<div class="filters">
+  <div class="fg">
+    <label>Modelo</label>
+    <select id="modelSelect" onchange="render()">
+      <option value="">Seleccionar modelo...</option>
+    </select>
+  </div>
+</div>
+
+<div class="kpis">
+  <div class="kp">
+    <div class="l">Elasticidad</div>
+    <div class="v" id="kElasticity" style="color:var(--green);">—</div>
+    <div class="s" id="kElasticityText">Cambio % en volumen por 1% en precio</div>
+  </div>
+  <div class="kp">
+    <div class="l">R²</div>
+    <div class="v" id="kRSq">—</div>
+    <div class="s">Ajuste del modelo estadístico</div>
+  </div>
+  <div class="kp">
+    <div class="l">p-valor</div>
+    <div class="v" id="kPVal">—</div>
+    <div class="s"><0.1 = significativo</div>
+  </div>
+  <div class="kp">
+    <div class="l">Observaciones</div>
+    <div class="v" id="kN">—</div>
+    <div class="s">Meses con datos</div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card full">
+    <h2 id="chart1Title">Precio de Trade-In vs Volumen</h2>
+    <svg id="timeSeriesChart" viewBox="0 0 1200 300"></svg>
+  </div>
+
+  <div class="card full">
+    <h2>Elasticidad: % Cambio Precio vs % Cambio Volumen Ajustado</h2>
+    <svg id="scatterChart" viewBox="0 0 600 500"></svg>
+  </div>
+
+  <div class="card full">
+    <h2>Elasticidad por Modelo</h2>
+    <div id="elasticityBarsChart"></div>
+  </div>
+
+  <div class="interpretation">
+    <h2>Interpretación</h2>
+    <p id="interpretationText">Selecciona un modelo para ver la interpretación.</p>
+  </div>
+</div>
+
+<script>
+let RAW = null;
+
+fetch('data/processed/elasticity.json')
+  .then(r => r.json())
+  .then(d => { RAW = d; initElasticity(); })
+  .catch(e => console.error('Data load error:', e));
+
+
+let selectedModel = '';
+
+function initElasticity() {
+  // Populate model dropdown
+  const select = document.getElementById('modelSelect');
+  RAW.models.forEach(model => {
+    const opt = document.createElement('option');
+    opt.value = model;
+    opt.textContent = model;
+    select.appendChild(opt);
+  });
+
+  // Set first model as default
+  if (RAW.models.length > 0) {
+    selectedModel = RAW.models[0];
+    select.value = selectedModel;
+    render();
+  }
+}
+
+function render() {
+  selectedModel = document.getElementById('modelSelect').value;
+  if (!selectedModel) return;
+
+  updateKPIs();
+  drawTimeSeries();
+  drawScatter();
+  drawElasticityBars();
+  updateInterpretation();
+}
+
+function getElasticityData() {
+  return RAW.elasticity.find(e => e.model === selectedModel);
+}
+
+function getSeriesData() {
+  return RAW.series[selectedModel] || [];
+}
+
+function updateKPIs() {
+  const data = getElasticityData();
+  if (!data) return;
+
+  const elastEl = document.getElementById('kElasticity');
+  elastEl.textContent = (data.elasticity >= 0 ? '+' : '') + data.elasticity.toFixed(2);
+  elastEl.style.color = data.elasticity >= 0 ? 'var(--green)' : 'var(--red)';
+
+  document.getElementById('kRSq').textContent = (data.rSq * 100).toFixed(1) + '%';
+  document.getElementById('kPVal').textContent = data.pVal.toFixed(3);
+  document.getElementById('kN').textContent = data.n;
+}
+
+function drawTimeSeries() {
+  const series = getSeriesData();
+  if (!series.length) return;
+
+  const margin = { top: 20, right: 60, bottom: 30, left: 60 };
+  const width = 1200 - margin.left - margin.right;
+  const height = 300 - margin.top - margin.bottom;
+
+  const svg = document.getElementById('timeSeriesChart');
+  svg.innerHTML = '';
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('transform', `translate(${margin.left},${margin.top})`);
+
+  const xScale = d3.scalePoint().domain(series.map(d => d.ym)).range([0, width]);
+  const yPriceScale = d3.scaleLinear().domain([
+    d3.min(series, d => d.price) * 0.95,
+    d3.max(series, d => d.price) * 1.05
+  ]).range([height, 0]);
+  const yVolScale = d3.scaleLinear().domain([0, d3.max(series, d => d.vol) * 1.1]).range([height, 0]);
+
+  // Grid lines
+  g.appendChild(createGridLines(yPriceScale, width, height));
+
+  // Price area
+  const priceArea = d3.area()
+    .x(d => xScale(d.ym))
+    .y0(height)
+    .y1(d => yPriceScale(d.price));
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', priceArea(series));
+  path.setAttribute('fill', 'rgba(59, 130, 246, 0.15)');
+  g.appendChild(path);
+
+  // Price line
+  const priceLine = d3.line().x(d => xScale(d.ym)).y(d => yPriceScale(d.price));
+  const ppath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  ppath.setAttribute('d', priceLine(series));
+  ppath.setAttribute('stroke', '#3b82f6');
+  ppath.setAttribute('stroke-width', '2');
+  ppath.setAttribute('fill', 'none');
+  g.appendChild(ppath);
+
+  // Volume bars
+  series.forEach(d => {
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', xScale(d.ym) - 6);
+    rect.setAttribute('y', yVolScale(d.vol));
+    rect.setAttribute('width', '12');
+    rect.setAttribute('height', height - yVolScale(d.vol));
+    rect.setAttribute('fill', 'rgba(249, 115, 22, 0.7)');
+    g.appendChild(rect);
+  });
+
+  // Left Y axis (price)
+  const leftAxis = d3.axisLeft(yPriceScale).ticks(5);
+  const leftAxisG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  leftAxisG.setAttribute('class', 'axis');
+  leftAxisG.setAttribute('transform', `translate(0,0)`);
+  d3.select(leftAxisG).call(leftAxis);
+  g.appendChild(leftAxisG);
+
+  // Right Y axis (volume)
+  const rightAxis = d3.axisRight(yVolScale).ticks(5);
+  const rightAxisG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  rightAxisG.setAttribute('class', 'axis');
+  rightAxisG.setAttribute('transform', `translate(${width},0)`);
+  d3.select(rightAxisG).call(rightAxis);
+  g.appendChild(rightAxisG);
+
+  // Bottom axis
+  const bottomAxis = d3.axisBottom(xScale);
+  const bottomAxisG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  bottomAxisG.setAttribute('class', 'axis');
+  bottomAxisG.setAttribute('transform', `translate(0,${height})`);
+  d3.select(bottomAxisG).call(bottomAxis);
+  g.appendChild(bottomAxisG);
+
+  // Axis labels
+  const priceLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  priceLabel.setAttribute('x', -height / 2);
+  priceLabel.setAttribute('y', -45);
+  priceLabel.setAttribute('text-anchor', 'middle');
+  priceLabel.setAttribute('transform', 'rotate(-90)');
+  priceLabel.setAttribute('class', 'axis-label');
+  priceLabel.textContent = 'Precio (CLP)';
+  g.appendChild(priceLabel);
+
+  const volLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  volLabel.setAttribute('x', height / 2);
+  volLabel.setAttribute('y', width + 45);
+  volLabel.setAttribute('text-anchor', 'middle');
+  volLabel.setAttribute('transform', 'rotate(90)');
+  volLabel.setAttribute('class', 'axis-label');
+  volLabel.textContent = 'Volumen';
+  g.appendChild(volLabel);
+
+  svg.appendChild(g);
+  document.getElementById('chart1Title').textContent = `Precio de Trade-In vs Volumen — ${selectedModel}`;
+}
+
+function drawScatter() {
+  const data = getElasticityData();
+  if (!data || !data.scatter) return;
+
+  const scatter = data.scatter;
+  const margin = { top: 40, right: 40, bottom: 40, left: 60 };
+  const width = 600 - margin.left - margin.right;
+  const height = 500 - margin.top - margin.bottom;
+
+  const svg = document.getElementById('scatterChart');
+  svg.innerHTML = '';
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('transform', `translate(${margin.left},${margin.top})`);
+
+  const xScale = d3.scaleLinear()
+    .domain([d3.min(scatter, d => d.x) * 1.1, d3.max(scatter, d => d.x) * 1.1])
+    .range([0, width]);
+  const yScale = d3.scaleLinear()
+    .domain([d3.min(scatter, d => d.y) * 1.1, d3.max(scatter, d => d.y) * 1.1])
+    .range([height, 0]);
+
+  // Grid lines
+  g.appendChild(createGridLines(yScale, width, height));
+
+  // Center lines (axes)
+  const centerX = xScale(0);
+  const centerY = yScale(0);
+
+  const xLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  xLine.setAttribute('x1', 0);
+  xLine.setAttribute('x2', width);
+  xLine.setAttribute('y1', centerY);
+  xLine.setAttribute('y2', centerY);
+  xLine.setAttribute('stroke', 'var(--border)');
+  xLine.setAttribute('stroke-width', '1');
+  g.appendChild(xLine);
+
+  const yLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  yLine.setAttribute('x1', centerX);
+  yLine.setAttribute('x2', centerX);
+  yLine.setAttribute('y1', 0);
+  yLine.setAttribute('y2', height);
+  yLine.setAttribute('stroke', 'var(--border)');
+  yLine.setAttribute('stroke-width', '1');
+  g.appendChild(yLine);
+
+  // Quadrant labels
+  const labels = [
+    { text: 'Precio ↑ Vol ↑', x: width * 0.75, y: height * 0.2 },
+    { text: 'Precio ↓ Vol ↑', x: width * 0.25, y: height * 0.2 },
+    { text: 'Precio ↓ Vol ↓', x: width * 0.25, y: height * 0.8 },
+    { text: 'Precio ↑ Vol ↓', x: width * 0.75, y: height * 0.8 }
+  ];
+  labels.forEach(l => {
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', l.x);
+    text.setAttribute('y', l.y);
+    text.setAttribute('class', 'quadrant-label');
+    text.textContent = l.text;
+    g.appendChild(text);
+  });
+
+  // Regression line if significant
+  if (data.significant) {
+    const xs = [d3.min(scatter, d => d.x), d3.max(scatter, d => d.x)];
+    const ys = xs.map(x => data.slope * x);
+    const regLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    regLine.setAttribute('x1', xScale(xs[0]));
+    regLine.setAttribute('y1', yScale(ys[0]));
+    regLine.setAttribute('x2', xScale(xs[1]));
+    regLine.setAttribute('y2', yScale(ys[1]));
+    regLine.setAttribute('class', 'regression-line');
+    regLine.setAttribute('stroke-dasharray', '4,4');
+    g.appendChild(regLine);
+  }
+
+  // Dots
+  const now = new Date();
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+  scatter.forEach(d => {
+    const [y, m] = d.ym.split('-').map(Number);
+    const pointDate = new Date(y, m - 1, 1);
+    const isRecent = pointDate > sixMonthsAgo;
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', xScale(d.x));
+    circle.setAttribute('cy', yScale(d.y));
+    circle.setAttribute('r', '4');
+    circle.setAttribute('class', `scatter-dot ${isRecent ? 'recent' : 'old'}`);
+    circle.setAttribute('fill', isRecent ? '#3b82f6' : '#9333ea');
+    circle.setAttribute('opacity', isRecent ? '0.8' : '0.4');
+    circle.setAttribute('data-ym', d.ym);
+    g.appendChild(circle);
+  });
+
+  // Axes
+  const xAxis = d3.axisBottom(xScale).ticks(6);
+  const xAxisG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  xAxisG.setAttribute('class', 'axis');
+  xAxisG.setAttribute('transform', `translate(0,${height})`);
+  d3.select(xAxisG).call(xAxis);
+  g.appendChild(xAxisG);
+
+  const yAxis = d3.axisLeft(yScale).ticks(6);
+  const yAxisG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  yAxisG.setAttribute('class', 'axis');
+  d3.select(yAxisG).call(yAxis);
+  g.appendChild(yAxisG);
+
+  // Axis labels
+  const xLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  xLabel.setAttribute('x', width / 2);
+  xLabel.setAttribute('y', height + 35);
+  xLabel.setAttribute('text-anchor', 'middle');
+  xLabel.setAttribute('class', 'axis-label');
+  xLabel.textContent = '% Cambio Precio';
+  g.appendChild(xLabel);
+
+  const yLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  yLabel.setAttribute('x', -height / 2);
+  yLabel.setAttribute('y', -50);
+  yLabel.setAttribute('text-anchor', 'middle');
+  yLabel.setAttribute('transform', 'rotate(-90)');
+  yLabel.setAttribute('class', 'axis-label');
+  yLabel.textContent = '% Cambio Volumen (Ajustado)';
+  g.appendChild(yLabel);
+
+  svg.appendChild(g);
+}
+
+function drawElasticityBars() {
+  const container = document.getElementById('elasticityBarsChart');
+  container.innerHTML = '';
+
+  const sorted = [...RAW.elasticity].sort((a, b) => b.avgVol - a.avgVol);
+
+  sorted.forEach(d => {
+    const isSelected = d.model === selectedModel;
+    const div = document.createElement('div');
+    div.style.cssText = `
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:8px;
+      padding:8px;
+      border-radius:6px;
+      background:${isSelected ? 'rgba(59, 130, 246, 0.1)' : 'transparent'};
+      border:1px solid ${isSelected ? 'var(--accent)' : 'transparent'};
+    `;
+
+    const label = document.createElement('div');
+    label.className = 'bar-label';
+    label.textContent = d.model;
+    label.style.fontWeight = isSelected ? '600' : '400';
+    label.style.color = isSelected ? 'var(--t1)' : 'var(--t2)';
+
+    const barContainer = document.createElement('div');
+    barContainer.style.cssText = 'display:flex;align-items:center;flex:1;';
+
+    const maxElast = Math.max(...RAW.elasticity.map(x => Math.abs(x.elasticity)));
+    const barWidth = 150;
+    const normalized = d.elasticity / maxElast;
+    const barLength = Math.abs(normalized) * barWidth;
+    const isPositive = d.elasticity >= 0;
+
+    const bar = document.createElement('div');
+    bar.style.cssText = `
+      height:20px;
+      width:${barLength}px;
+      background:${isPositive ? 'var(--green)' : 'var(--red)'};
+      border-radius:3px;
+      margin-left:${isPositive ? '0' : barLength}px;
+      opacity:0.8;
+    `;
+    if (!isPositive) bar.style.marginLeft = '0';
+
+    barContainer.appendChild(bar);
+
+    const value = document.createElement('div');
+    value.className = 'bar-value';
+    value.textContent = (d.elasticity >= 0 ? '+' : '') + d.elasticity.toFixed(2);
+    value.style.color = isPositive ? 'var(--green)' : 'var(--red)';
+
+    const sig = document.createElement('span');
+    sig.className = 'bar-sig';
+    if (d.pVal < 0.1) sig.textContent = '★';
+
+    div.appendChild(label);
+    div.appendChild(barContainer);
+    div.appendChild(value);
+    div.appendChild(sig);
+    container.appendChild(div);
+  });
+}
+
+function updateInterpretation() {
+  const data = getElasticityData();
+  if (!data) return;
+
+  const container = document.getElementById('interpretationText');
+  let text = '';
+
+  if (data.significant) {
+    if (data.elasticity > 0) {
+      text = `El volumen de trade-in de <strong>${selectedModel}</strong> responde al precio. Un aumento de 10% en el precio de recompra generaría aproximadamente <strong>~${(data.elasticity * 10).toFixed(1)}%</strong> más volumen.`;
+    } else {
+      text = `El precio y volumen de <strong>${selectedModel}</strong> se mueven en dirección opuesta. Esto sugiere que factores externos (lanzamientos, estacionalidad) dominan sobre el precio.`;
+    }
+  } else {
+    text = `No hay evidencia estadística de que el precio de recompra de <strong>${selectedModel}</strong> afecte significativamente el volumen de trade-ins (<strong>p=${data.pVal.toFixed(3)}</strong>). El volumen depende más de la estacionalidad y el ciclo de vida del modelo.`;
+  }
+
+  container.innerHTML = text;
+}
+
+function createGridLines(yScale, width, height) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  yScale.ticks(5).forEach(tick => {
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', 0);
+    line.setAttribute('x2', width);
+    line.setAttribute('y1', yScale(tick));
+    line.setAttribute('y2', yScale(tick));
+    line.setAttribute('class', 'grid-line');
+    g.appendChild(line);
+  });
+  return g;
+}
+
+
+</script>
+
+<script>
+// Inline payload data
+// Data embedded in RAW above
+</script>
+
+</body>
+</html>

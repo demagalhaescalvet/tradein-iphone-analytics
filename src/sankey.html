@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade-In iPhone — Sankey de Migración</title>
+<style>
+:root {
+    --bg: #0f172a; --card: #1e293b; --border: #334155;
+    --t1: #f1f5f9; --t2: #94a3b8; --t3: #64748b;
+    --accent: #3b82f6; --green: #10b981; --red: #ef4444; --purple: #8b5cf6; --amber: #f59e0b;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:var(--bg); color:var(--t1); }
+.hdr { background:linear-gradient(135deg,#1e293b,#334155); padding:20px 28px; border-bottom:2px solid var(--purple); }
+.hdr h1 { font-size:22px; font-weight:700; }
+.hdr p { color:var(--t2); font-size:13px; margin-top:4px; }
+.ctrl-bar { display:flex; gap:14px; align-items:end; flex-wrap:wrap; padding:14px 28px; background:var(--card); border-bottom:1px solid var(--border); }
+.fg { display:flex; flex-direction:column; gap:3px; }
+.fg label { font-size:10px; color:var(--t2); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+.fg select,.fg input { padding:7px 10px; border:1px solid var(--border); border-radius:7px; background:var(--bg); color:var(--t1); font-size:13px; min-width:140px; }
+.fg select:focus,.fg input:focus { outline:none; border-color:var(--accent); }
+.fg select option { background:var(--bg); }
+.btn { padding:7px 14px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--t2); cursor:pointer; font-size:12px; font-weight:600; }
+.btn:hover { border-color:var(--accent); color:var(--accent); }
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; padding:14px 28px; }
+.kp { background:var(--card); border-radius:10px; padding:14px 16px; border:1px solid var(--border); }
+.kp .l { font-size:10px; color:var(--t2); text-transform:uppercase; letter-spacing:.3px; }
+.kp .v { font-size:22px; font-weight:700; margin-top:2px; }
+.kp .s { font-size:10px; color:var(--t3); }
+.wrap { padding:8px 28px 24px; }
+.crd { background:var(--card); border-radius:12px; border:1px solid var(--border); padding:20px; }
+.crd h3 { font-size:14px; font-weight:600; margin-bottom:4px; }
+.crd .sub { font-size:11px; color:var(--t3); margin-bottom:14px; }
+#sankey-svg { width:100%; }
+.tip { position:absolute; pointer-events:none; background:#1e293bee; border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:12px; color:var(--t1); display:none; box-shadow:0 8px 24px rgba(0,0,0,.4); max-width:280px; z-index:100; }
+.tip b { display:block; font-size:13px; margin-bottom:4px; }
+.tip .r { display:flex; justify-content:space-between; gap:14px; padding:1px 0; }
+.tip .r span:last-child { font-weight:600; }
+.empty { text-align:center; padding:60px 20px; color:var(--t3); }
+.lk { transition: fill-opacity 0.3s ease, stroke-opacity 0.3s ease; }
+.node-rect { transition: filter 0.3s ease; }
+.node-rect:hover { filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6)); }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes drawPath { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
+#sankey-svg { animation: fadeIn 0.6s ease-out; }
+.lk { stroke-dasharray: 1000; animation: drawPath 1.2s ease-out forwards; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+</head>
+<body>
+<nav style="background:#0c111b;padding:0 28px;display:flex;align-items:center;border-bottom:1px solid #1e293b;font-family:'DM Sans',-apple-system,sans-serif;font-size:13px;height:44px;gap:0;">
+<a href="index.html" style="color:#475569;text-decoration:none;font-weight:600;padding:0 14px 0 0;border-right:1px solid #1e293b;margin-right:4px;display:flex;align-items:center;gap:4px;height:100%;">
+<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Hub</a>
+<a href="dashboard.html" class="nav-link" id="nav-dashboard" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Dashboard</a>
+<a href="explorer.html" class="nav-link" id="nav-explorer" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Explorer</a>
+<a href="sankey.html" class="nav-link" id="nav-sankey" style="color:#f1f5f9;text-decoration:none;padding:10px 14px;border-bottom:2px solid #3b82f6;font-weight:600;display:flex;align-items:center;gap:5px;height:100%;">Sankey</a>
+<a href="insights.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Insights</a>
+<a href="curves.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Curvas</a>
+<a href="benchmark.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Benchmark</a>
+<a href="elasticity.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
+</nav>
+
+<div class="hdr">
+    <h1>Trade-In iPhone — Flujo de Migración (Sankey)</h1>
+    <p id="sLabel">Visualiza el flujo de equipos entregados hacia equipos comprados</p>
+</div>
+<div class="ctrl-bar">
+    <div class="fg"><label>Modelo Return</label><select id="fFrom" onchange="render()"><option value="all">Todos</option></select></div>
+    <div class="fg"><label>Modelo Purchase</label><select id="fTo" onchange="render()"><option value="all">Todos</option></select></div>
+    <div class="fg"><label>Desde</label><input type="date" id="fDS" onchange="render()"></div>
+    <div class="fg"><label>Hasta</label><input type="date" id="fDE" onchange="render()"></div>
+    <div class="fg"><label>Mín. Trade-Ins</label><input type="number" id="fMin" value="10" min="1" max="500" style="width:75px" onchange="render()"></div>
+    <div class="fg" style="justify-content:end"><button class="btn" onclick="resetF()">Reset</button></div>
+</div>
+<div class="kpis">
+    <div class="kp"><div class="l">Trade-Ins</div><div class="v" id="k1" style="color:var(--accent)">—</div></div>
+    <div class="kp"><div class="l">Rutas de Migración</div><div class="v" id="k2" style="color:var(--purple)">—</div></div>
+    <div class="kp"><div class="l">Ruta Top</div><div class="v" id="k3" style="color:var(--amber);font-size:13px">—</div><div class="s" id="k3s"></div></div>
+    <div class="kp"><div class="l">Diferencial Prom.</div><div class="v" id="k4" style="color:var(--green)">—</div><div class="s">CLP adicional promedio</div></div>
+</div>
+<div class="wrap">
+    <div class="crd">
+        <h3>Flujo Entrega → Compra</h3>
+        <div class="sub">El grosor de cada flujo es proporcional a la cantidad de trade-ins. Pase el mouse para detalles. Click en un nodo para filtrar.</div>
+        <div id="chart"></div>
+    </div>
+</div>
+<div class="wrap">
+    <div class="crd">
+        <h3>Evolución Temporal de Trade-Ins</h3>
+        <div class="sub">Volumen mensual de trade-ins filtrados. Selecciona un modelo de Return y/o Purchase para ver cuándo ocurrieron.</div>
+        <div id="timelineChart"></div>
+    </div>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+let RAW = null;
+
+function initSankey() {
+    if (RAW) {
+        render();
+    }
+}
+
+fetch('data/processed/sankey.json')
+    .then(r => r.json())
+    .then(d => { RAW = d; initSankey(); })
+    .catch(e => console.error('Data load error:', e));
+const PAL = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16','#a855f7','#e11d48','#0ea5e9','#d946ef','#22d3ee','#fb923c','#4ade80','#facc15','#818cf8','#fb7185','#2dd4bf','#fbbf24','#a78bfa','#34d399','#f87171','#60a5fa','#c084fc'];
+const MC = {}; RAW.models.forEach((m,i) => MC[m] = PAL[i%PAL.length]);
+const fmt = n => n.toLocaleString('es-CL');
+const fmtC = n => n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+Math.round(n/1e3)+'K':'$'+n;
+
+// Populate
+RAW.models.forEach(m => {
+    document.getElementById('fFrom').add(new Option(m,m));
+    document.getElementById('fTo').add(new Option(m,m));
+});
+document.getElementById('fDS').value='2023-07-01';
+document.getElementById('fDE').value=RAW.dateMax;
+
+function resetF(){
+    document.getElementById('fFrom').value='all';
+    document.getElementById('fTo').value='all';
+    document.getElementById('fDS').value='2023-07-01';
+    document.getElementById('fDE').value=RAW.dateMax;
+    document.getElementById('fMin').value=10;
+    render();
+}
+
+function getFlows(){
+    const ff=document.getElementById('fFrom').value;
+    const ft=document.getElementById('fTo').value;
+    const ds=document.getElementById('fDS').value;
+    const de=document.getElementById('fDE').value;
+    const mn=parseInt(document.getElementById('fMin').value)||1;
+    const agg={};
+    RAW.flows.forEach(r=>{
+        if(ff!=='all'&&r.from_model!==ff)return;
+        if(ft!=='all'&&r.to_model!==ft)return;
+        if(ds&&r.ym<ds.substring(0,7))return;
+        if(de&&r.ym>de.substring(0,7))return;
+        const k=r.from_model+'|'+r.to_model;
+        if(!agg[k])agg[k]={from:r.from_model,to:r.to_model,count:0,trv:0,tpv:0,td:0};
+        agg[k].count+=r.count;
+        agg[k].trv+=r.avg_ret*r.count;
+        agg[k].tpv+=r.avg_pur*r.count;
+        agg[k].td+=r.avg_delta*r.count;
+    });
+    return Object.values(agg).filter(f=>f.count>=mn).map(f=>({
+        ...f, avgRet:Math.round(f.trv/f.count), avgPur:Math.round(f.tpv/f.count), avgDelta:Math.round(f.td/f.count)
+    })).sort((a,b)=>b.count-a.count);
+}
+
+// Simple Sankey layout algorithm (no external dependencies)
+function layoutSankey(flows, W, H){
+    // Collect unique nodes on each side
+    const leftSet=new Set(), rightSet=new Set();
+    flows.forEach(f=>{leftSet.add(f.from); rightSet.add(f.to);});
+
+    // Sort by total flow
+    const leftTotals={}, rightTotals={};
+    flows.forEach(f=>{
+        leftTotals[f.from]=(leftTotals[f.from]||0)+f.count;
+        rightTotals[f.to]=(rightTotals[f.to]||0)+f.count;
+    });
+    const leftNodes=[...leftSet].sort((a,b)=>leftTotals[b]-leftTotals[a]);
+    const rightNodes=[...rightSet].sort((a,b)=>rightTotals[b]-rightTotals[a]);
+
+    const nodeW=16, padX=220, gap=6;
+    const totalLeft=leftNodes.reduce((s,n)=>s+leftTotals[n],0);
+    const totalRight=rightNodes.reduce((s,n)=>s+rightTotals[n],0);
+    const maxTotal=Math.max(totalLeft,totalRight);
+    const usableH=H-(Math.max(leftNodes.length,rightNodes.length)-1)*gap;
+    const scale=usableH/maxTotal;
+
+    // Position left nodes
+    const lPos={};
+    let ly=0;
+    leftNodes.forEach(n=>{
+        const h=Math.max(4, leftTotals[n]*scale);
+        lPos[n]={x:padX, y:ly, h:h, total:leftTotals[n], used:0};
+        ly+=h+gap;
+    });
+
+    // Position right nodes
+    const rPos={};
+    let ry=0;
+    rightNodes.forEach(n=>{
+        const h=Math.max(4, rightTotals[n]*scale);
+        rPos[n]={x:W-padX-nodeW, y:ry, h:h, total:rightTotals[n], used:0};
+        ry+=h+gap;
+    });
+
+    // Build link paths
+    const links=flows.map(f=>{
+        const ln=lPos[f.from], rn=rPos[f.to];
+        const lh=Math.max(2, (f.count/ln.total)*ln.h);
+        const rh=Math.max(2, (f.count/rn.total)*rn.h);
+        const sy=ln.y+ln.used+lh/2;
+        const ty=rn.y+rn.used+rh/2;
+        ln.used+=lh;
+        rn.used+=rh;
+        const sx=padX+nodeW, tx=W-padX-nodeW;
+        const w=(lh+rh)/2;
+        // Bezier path
+        const mx=(sx+tx)/2;
+        const path=`M${sx},${sy-w/2} C${mx},${sy-w/2} ${mx},${ty-w/2} ${tx},${ty-w/2} L${tx},${ty+w/2} C${mx},${ty+w/2} ${mx},${sy+w/2} ${sx},${sy+w/2} Z`;
+        return {path, w, from:f.from, to:f.to, count:f.count, avgRet:f.avgRet, avgPur:f.avgPur, avgDelta:f.avgDelta, color:MC[f.from]||'#3b82f6'};
+    });
+
+    const nodesL=leftNodes.map(n=>({name:n, ...lPos[n], side:'ret', color:MC[n]}));
+    const nodesR=rightNodes.map(n=>({name:n, ...rPos[n], side:'pur', color:MC[n], x:rPos[n].x}));
+    return {links, nodesL, nodesR, nodeW, totalH:Math.max(ly,ry)};
+}
+
+function renderTimeline(){
+    d3.select('#timelineChart').html('');
+    
+    const ff=document.getElementById('fFrom').value;
+    const ft=document.getElementById('fTo').value;
+    const ds=document.getElementById('fDS').value;
+    const de=document.getElementById('fDE').value;
+
+    // Filter RAW.flows directly (they have ym)
+    const filtered=RAW.flows.filter(r=>{
+        if(ff!=='all'&&r.from_model!==ff)return false;
+        if(ft!=='all'&&r.to_model!==ft)return false;
+        if(ds&&r.ym<ds.substring(0,7))return false;
+        if(de&&r.ym>de.substring(0,7))return false;
+        return true;
+    });
+    if(filtered.length===0){
+        d3.select('#timelineChart').html('<div style="text-align:center;padding:40px;color:#475569;">Sin datos para los filtros seleccionados</div>');
+        return;
+    }
+
+    const container=document.getElementById('timelineChart');
+    const W=container.clientWidth||900;
+    const H=250;
+    const margin={top:20,right:20,bottom:50,left:50};
+    const w=W-margin.left-margin.right;
+    const h=H-margin.top-margin.bottom;
+
+    // Determine chart mode
+    const hasFrom=ff!=='all';
+    const hasTo=ft!=='all';
+
+    if(hasFrom&&hasTo){
+        // Single route: simple area
+        const byYm={};
+        filtered.forEach(r=>{byYm[r.ym]=(byYm[r.ym]||0)+r.count;});
+        const months=Object.keys(byYm).sort();
+        const vals=months.map(m=>byYm[m]);
+        
+        const svg=d3.select('#timelineChart').append('svg').attr('viewBox',`0 0 ${W} ${H}`).style('width','100%');
+        const g=svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
+        const x=d3.scalePoint().domain(months).range([0,w]).padding(0.5);
+        const y=d3.scaleLinear().domain([0,d3.max(vals)||1]).range([h,0]);
+        
+        const area=d3.area().x((_,i)=>x(months[i])).y0(h).y1((_,i)=>y(vals[i])).curve(d3.curveMonotoneX);
+        const line=d3.line().x((_,i)=>x(months[i])).y((_,i)=>y(vals[i])).curve(d3.curveMonotoneX);
+        
+        g.append('path').datum(vals).attr('d',area).attr('fill','#3b82f6').attr('fill-opacity',0.3);
+        g.append('path').datum(vals).attr('d',line).attr('fill','none').attr('stroke','#3b82f6').attr('stroke-width',2);
+        g.selectAll('.dot').data(vals).enter().append('circle').attr('cx',(_,i)=>x(months[i])).attr('cy',(_,i)=>y(vals[i])).attr('r',3).attr('fill','#3b82f6');
+        
+        g.append('g').attr('transform',`translate(0,${h})`).call(d3.axisBottom(x)).selectAll('text').attr('transform','rotate(45)').attr('text-anchor','start').style('fill','#94a3b8').style('font-size','10px');
+        g.append('g').call(d3.axisLeft(y).ticks(5)).selectAll('text').style('fill','#94a3b8').style('font-size','10px');
+        g.selectAll('.domain').style('stroke','#334155');
+        g.selectAll('.tick line').style('stroke','#1e293b');
+        
+    } else {
+        // Stacked area: by the "other" dimension
+        const groupKey=hasFrom?'to_model':hasTo?'from_model':null;
+        
+        if(!groupKey){
+            // No model filter: total by month
+            const byYm={};
+            filtered.forEach(r=>{byYm[r.ym]=(byYm[r.ym]||0)+r.count;});
+            const months=Object.keys(byYm).sort();
+            const vals=months.map(m=>byYm[m]);
+            
+            const svg=d3.select('#timelineChart').append('svg').attr('viewBox',`0 0 ${W} ${H}`).style('width','100%');
+            const g=svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
+            const x=d3.scalePoint().domain(months).range([0,w]).padding(0.5);
+            const y=d3.scaleLinear().domain([0,d3.max(vals)||1]).range([h,0]);
+            
+            const area=d3.area().x((_,i)=>x(months[i])).y0(h).y1((_,i)=>y(vals[i])).curve(d3.curveMonotoneX);
+            g.append('path').datum(vals).attr('d',area).attr('fill','#3b82f6').attr('fill-opacity',0.3);
+            g.append('path').datum(vals).attr('d',d3.line().x((_,i)=>x(months[i])).y((_,i)=>y(vals[i])).curve(d3.curveMonotoneX)).attr('fill','none').attr('stroke','#3b82f6').attr('stroke-width',2);
+            
+            g.append('g').attr('transform',`translate(0,${h})`).call(d3.axisBottom(x)).selectAll('text').attr('transform','rotate(45)').attr('text-anchor','start').style('fill','#94a3b8').style('font-size','10px');
+            g.append('g').call(d3.axisLeft(y).ticks(5)).selectAll('text').style('fill','#94a3b8').style('font-size','10px');
+            g.selectAll('.domain').style('stroke','#334155');
+            g.selectAll('.tick line').style('stroke','#1e293b');
+            return;
+        }
+        
+        // Stacked by groupKey
+        const modelCounts={};
+        filtered.forEach(r=>{modelCounts[r[groupKey]]=(modelCounts[r[groupKey]]||0)+r.count;});
+        const topModels=Object.entries(modelCounts).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]);
+        
+        const months=[...new Set(filtered.map(r=>r.ym))].sort();
+        const stackData=months.map(ym=>{
+            const row={ym};
+            topModels.forEach(m=>{row[m]=0;});
+            row._other=0;
+            filtered.filter(r=>r.ym===ym).forEach(r=>{
+                if(topModels.includes(r[groupKey])) row[r[groupKey]]+=r.count;
+                else row._other+=r.count;
+            });
+            return row;
+        });
+        
+        const keys=[...topModels];
+        if(stackData.some(d=>d._other>0)) keys.push('_other');
+        
+        const stack=d3.stack().keys(keys);
+        const stacked=stack(stackData);
+        
+        const svg=d3.select('#timelineChart').append('svg').attr('viewBox',`0 0 ${W} ${H}`).style('width','100%');
+        const g=svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
+        const x=d3.scalePoint().domain(months).range([0,w]).padding(0.5);
+        const yMax=d3.max(stacked[stacked.length-1],d=>d[1])||1;
+        const y=d3.scaleLinear().domain([0,yMax]).range([h,0]);
+        
+        const area=d3.area().x((d,i)=>x(months[i])).y0(d=>y(d[0])).y1(d=>y(d[1])).curve(d3.curveMonotoneX);
+        
+        g.selectAll('.stream').data(stacked).enter().append('path').attr('class','stream')
+            .attr('d',area)
+            .attr('fill',(d,i)=>PAL[i%PAL.length])
+            .attr('fill-opacity',0.7)
+            .on('mouseover',function(event,d){
+                const name=d.key==='_other'?'Otros':d.key;
+                tip.innerHTML='<b>'+name+'</b>';tip.style.display='block';
+                moveTip(event);
+            })
+            .on('mousemove',function(event){moveTip(event);})
+            .on('mouseout',function(){tip.style.display='none';});
+        
+        g.append('g').attr('transform',`translate(0,${h})`).call(d3.axisBottom(x)).selectAll('text').attr('transform','rotate(45)').attr('text-anchor','start').style('fill','#94a3b8').style('font-size','10px');
+        g.append('g').call(d3.axisLeft(y).ticks(5)).selectAll('text').style('fill','#94a3b8').style('font-size','10px');
+        g.selectAll('.domain').style('stroke','#334155');
+        g.selectAll('.tick line').style('stroke','#1e293b');
+        
+        // Legend
+        const legend=svg.append('g').attr('transform',`translate(${margin.left},${H-10})`);
+        keys.forEach((k,i)=>{
+            const name=k==='_other'?'Otros':k;
+            legend.append('rect').attr('x',i*130).attr('y',0).attr('width',10).attr('height',10).attr('fill',PAL[i%PAL.length]).attr('rx',2);
+            legend.append('text').attr('x',i*130+14).attr('y',9).text(name).style('fill','#94a3b8').style('font-size','9px');
+        });
+    }
+}
+
+function render(){
+    const flows=getFlows();
+    // KPIs
+    const total=flows.reduce((s,f)=>s+f.count,0);
+    document.getElementById('k1').textContent=fmt(total);
+    document.getElementById('k2').textContent=fmt(flows.length);
+    if(flows.length>0){
+        document.getElementById('k3').textContent=flows[0].from+' → '+flows[0].to;
+        document.getElementById('k3s').textContent=fmt(flows[0].count)+' trade-ins';
+        const wd=flows.reduce((s,f)=>s+f.avgDelta*f.count,0)/(total||1);
+        document.getElementById('k4').textContent=fmtC(wd);
+    } else {
+        document.getElementById('k3').textContent='—';
+        document.getElementById('k3s').textContent='';
+        document.getElementById('k4').textContent='—';
+    }
+
+    const box=document.getElementById('chart');
+    if(flows.length===0){ box.innerHTML='<div class="empty">Sin datos para los filtros seleccionados.</div>'; return; }
+
+    const W=box.clientWidth||900;
+    const H=Math.max(450, Math.min(flows.length*22+80, 900));
+    const {links, nodesL, nodesR, nodeW, totalH}=layoutSankey(flows, W, H);
+    const svgH=Math.max(H, totalH+20);
+
+    let svg=`<svg id="sankey-svg" width="${W}" height="${svgH}" viewBox="0 0 ${W} ${svgH}">`;
+
+    // Column labels
+    svg+=`<text x="220" y="14" fill="#ef4444" font-size="11" font-weight="700" letter-spacing="0.5">RETURN (entrega)</text>`;
+    svg+=`<text x="${W-220}" y="14" fill="#10b981" font-size="11" font-weight="700" text-anchor="end" letter-spacing="0.5">PURCHASE (compra)</text>`;
+
+    // Links
+    links.forEach((lk,i)=>{
+        svg+=`<path d="${lk.path}" fill="${lk.color}" fill-opacity="0.2" stroke="${lk.color}" stroke-opacity="0.35" stroke-width="0.5" class="lk" data-i="${i}"
+            onmouseenter="showTip(event,${i})" onmousemove="moveTip(event)" onmouseleave="hideTip()"/>`;
+    });
+
+    // Left nodes
+    nodesL.forEach(n=>{
+        svg+=`<rect x="${n.x}" y="${n.y}" width="${nodeW}" height="${Math.max(4,n.h)}" rx="3" fill="${n.color}" class="node-rect" cursor="pointer" onclick="clickNode('from','${n.name}')"/>`;
+        if(n.h>=12) svg+=`<text x="${n.x-6}" y="${n.y+n.h/2+4}" text-anchor="end" fill="#e2e8f0" font-size="11" font-weight="500">${n.name} (${fmt(n.total)})</text>`;
+    });
+
+    // Right nodes
+    nodesR.forEach(n=>{
+        svg+=`<rect x="${n.x}" y="${n.y}" width="${nodeW}" height="${Math.max(4,n.h)}" rx="3" fill="${n.color}" class="node-rect" cursor="pointer" onclick="clickNode('to','${n.name}')"/>`;
+        if(n.h>=12) svg+=`<text x="${n.x+nodeW+6}" y="${n.y+n.h/2+4}" text-anchor="start" fill="#e2e8f0" font-size="11" font-weight="500">${n.name} (${fmt(n.total)})</text>`;
+    });
+
+    svg+='</svg>';
+    box.innerHTML=svg;
+
+    // D3.js enhancements
+    const svgEl=d3.select('#sankey-svg');
+
+    // Fade-in animation for SVG
+    svgEl.transition().duration(600).style('opacity', 1);
+
+    // Animate link drawing from left to right
+    svgEl.selectAll('.lk')
+        .style('stroke-dasharray', 1000)
+        .style('stroke-dashoffset', 1000)
+        .transition()
+        .duration(1200)
+        .ease(d3.easeLinear)
+        .style('stroke-dashoffset', 0);
+
+    // D3-powered hover effects on links with smooth transitions
+    svgEl.selectAll('.lk')
+        .on('mouseenter', function(){
+            d3.select(this)
+                .transition()
+                .duration(300)
+                .attr('fill-opacity', 0.45)
+                .attr('stroke-opacity', 0.7);
+        })
+        .on('mouseleave', function(){
+            d3.select(this)
+                .transition()
+                .duration(300)
+                .attr('fill-opacity', 0.2)
+                .attr('stroke-opacity', 0.35);
+        });
+
+    // D3 positioning and enhanced tooltip positioning
+    const tooltipBox=document.getElementById('tip');
+    svgEl.selectAll('.lk')
+        .on('mousemove', function(e){
+            const [x, y]=d3.pointer(e, this);
+            const pageX=e.pageX;
+            const pageY=e.pageY;
+            tooltipBox.style.left=(pageX+14)+'px';
+            tooltipBox.style.top=(pageY-10)+'px';
+        });
+
+    // Store link data for tooltips
+    window._links=links;
+
+    // Status
+    const ff=document.getElementById('fFrom').value;
+    const ft=document.getElementById('fTo').value;
+    let lbl='Todos los modelos';
+    if(ff!=='all'&&ft!=='all') lbl=ff+' → '+ft;
+    else if(ff!=='all') lbl='Returns de '+ff;
+    else if(ft!=='all') lbl='Purchases de '+ft;
+    document.getElementById('sLabel').textContent=lbl+' · '+fmt(total)+' trade-ins · '+flows.length+' rutas · Click en nodo para filtrar';
+
+    // Render temporal evolution chart
+    renderTimeline();
+}
+
+function clickNode(side,name){
+    if(side==='from') document.getElementById('fFrom').value=name;
+    else document.getElementById('fTo').value=name;
+    render();
+}
+
+const tip=document.getElementById('tip');
+function showTip(e,i){
+    const lk=window._links[i];
+    tip.innerHTML=`<b>${lk.from} → ${lk.to}</b>
+        <div class="r"><span>Trade-Ins</span><span>${fmt(lk.count)}</span></div>
+        <div class="r"><span>Valor Return</span><span>${fmtC(lk.avgRet)}</span></div>
+        <div class="r"><span>Valor Purchase</span><span>${fmtC(lk.avgPur)}</span></div>
+        <div class="r"><span>Diferencial</span><span style="color:#10b981">${fmtC(lk.avgDelta)}</span></div>`;
+    tip.style.display='block';
+    moveTip(e);
+}
+function moveTip(e){ tip.style.left=(e.pageX+14)+'px'; tip.style.top=(e.pageY-10)+'px'; }
+function hideTip(){ tip.style.display='none'; }
+
+// Hover highlight
+document.addEventListener('mouseenter',function(e){
+    if(e.target.classList.contains('lk')){
+        e.target.setAttribute('fill-opacity','0.45');
+        e.target.setAttribute('stroke-opacity','0.7');
+    }
+},true);
+document.addEventListener('mouseleave',function(e){
+    if(e.target.classList.contains('lk')){
+        e.target.setAttribute('fill-opacity','0.2');
+        e.target.setAttribute('stroke-opacity','0.35');
+    }
+},true);
+
+// Initialization moved to fetch handler above
+window.addEventListener('resize',render);
+</script>
+</body>
+</html>

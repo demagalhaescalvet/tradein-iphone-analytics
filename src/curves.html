@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade-In iPhone — Curvas de Valor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+:root { --bg:#0c111b; --card:#141b2b; --border:#1e293b; --t1:#f1f5f9; --t2:#94a3b8; --t3:#475569; --accent:#3b82f6; --green:#10b981; --red:#ef4444; --amber:#f59e0b; --purple:#a855f7; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); color:var(--t1); }
+
+nav { background:var(--bg); padding:0 28px; display:flex; align-items:center; border-bottom:1px solid var(--border); font-size:13px; height:44px; }
+nav a { color:var(--t3); text-decoration:none; padding:10px 14px; border-bottom:2px solid transparent; display:flex; align-items:center; height:100%; }
+nav a.active { color:var(--t1); border-bottom-color:var(--accent); font-weight:600; }
+nav .back { padding:0 14px 0 0; border-right:1px solid var(--border); margin-right:4px; font-weight:600; }
+
+.hdr { padding:20px 28px 0; }
+.hdr h1 { font-size:22px; font-weight:700; }
+.hdr p { color:var(--t2); font-size:13px; margin-top:4px; }
+
+.filters { display:flex; gap:14px; align-items:end; flex-wrap:wrap; padding:14px 28px 16px; }
+.fg { display:flex; flex-direction:column; gap:3px; }
+.fg label { font-size:10px; color:var(--t3); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+.fg select, .fg input { padding:7px 10px; border:1px solid var(--border); border-radius:7px; background:var(--bg); color:var(--t1); font-size:13px; min-width:150px; }
+.fg select:focus, .fg input:focus { outline:none; border-color:var(--accent); }
+.fg select option { background:var(--bg); }
+.btn { padding:7px 14px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--t2); cursor:pointer; font-size:12px; font-weight:600; }
+.btn:hover { border-color:var(--accent); color:var(--accent); }
+
+.kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; padding:0 28px 16px; }
+.kp { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+.kp .l { font-size:10px; color:var(--t3); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+.kp .v { font-size:22px; font-weight:700; margin-top:2px; }
+.kp .s { font-size:10px; color:var(--t3); margin-top:1px; }
+
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:0 28px 20px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; }
+.card h3 { font-size:14px; font-weight:600; margin-bottom:2px; }
+.card .sub { font-size:11px; color:var(--t3); margin-bottom:14px; }
+.full { grid-column:1/-1; }
+.chart-container { max-height:380px; width:100%; }
+.chart-container svg { overflow:visible; }
+
+.corr-table { width:100%; border-collapse:collapse; font-size:12px; }
+.corr-table th { text-align:left; padding:8px 10px; color:var(--t2); border-bottom:1px solid var(--border); font-size:10px; text-transform:uppercase; letter-spacing:.3px; }
+.corr-table td { padding:7px 10px; border-bottom:1px solid rgba(30,41,59,0.5); }
+.corr-table tr:hover { background:rgba(59,130,246,0.05); }
+.corr-pill { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+
+.d3-tooltip { position:absolute; padding:8px 12px; background:rgba(20,27,43,0.9); color:#f1f5f9; border:1px solid #1e293b; border-radius:6px; pointer-events:none; font-size:12px; z-index:1000; }
+.d3-tooltip.hidden { display:none; }
+
+@media(max-width:900px) { .grid{grid-template-columns:1fr;} .kpis{grid-template-columns:repeat(3,1fr);} }
+</style>
+</head>
+<body>
+<nav>
+<a href="index.html" class="back"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Hub</a>
+<a href="dashboard.html">Dashboard</a>
+<a href="explorer.html">Explorer</a>
+<a href="sankey.html">Sankey</a>
+<a href="insights.html">Insights</a>
+<a href="curves.html" class="active">Curvas</a>
+<a href="benchmark.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Benchmark</a>
+<a href="elasticity.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
+</nav>
+
+<div class="hdr">
+    <h1>Curvas de Valor de Trade-In</h1>
+    <p id="statusLabel">Evolución del valor de trade-in por modelo y grado, con correlación al volumen del programa</p>
+</div>
+
+<div class="filters">
+    <div class="fg"><label>Modelo iPhone</label><select id="fModel" onchange="render()"></select></div>
+    <div class="fg"><label>Grado</label>
+        <select id="fGrade" onchange="render()">
+            <option value="both">Grado A + B (comparar)</option>
+            <option value="Grado A">Solo Grado A</option>
+            <option value="Grado B">Solo Grado B</option>
+        </select>
+    </div>
+    <div class="fg"><label>Desde</label><input type="date" id="fDS" onchange="render()" oninput="render()"></div>
+    <div class="fg"><label>Hasta</label><input type="date" id="fDE" onchange="render()" oninput="render()"></div>
+    <div class="fg" style="justify-content:end"><button class="btn" onclick="resetF()">Reset</button></div>
+</div>
+
+<div class="kpis">
+    <div class="kp"><div class="l">Valor Actual</div><div class="v" style="color:var(--accent)" id="kVal">—</div><div class="s" id="kValS">valor en el último mes con datos</div></div>
+    <div class="kp"><div class="l">Variación Período</div><div class="v" id="kChange">—</div><div class="s">cambio entre primer y último mes</div></div>
+    <div class="kp"><div class="l">Spread A−B</div><div class="v" style="color:var(--green)" id="kSpread">—</div><div class="s">diferencia CLP entre grado A y B</div></div>
+    <div class="kp"><div class="l">Correlación Valor↔Actividad</div><div class="v" style="color:var(--purple)" id="kCorr">—</div><div class="s">entregas del modelo seleccionado</div></div>
+    <div class="kp"><div class="l">Trade-Ins Período</div><div class="v" style="color:var(--amber)" id="kCount">—</div><div class="s">entregas del modelo</div></div>
+</div>
+
+<div class="grid">
+    <div class="card full">
+        <h3 id="curveTitle">Curva de Valor de Trade-In</h3>
+        <div class="sub" id="curveSub">Valor promedio mensual del equipo devuelto, por grado</div>
+        <div id="curveChart" class="chart-container"></div>
+    </div>
+
+    <div class="card full">
+        <h3>Valor de Trade-In vs Volumen del Programa</h3>
+        <div class="sub">Eje izquierdo: valor promedio return (CLP). Eje derecho: volumen mensual de trade-ins (todo el programa)</div>
+        <div id="dualChart" class="chart-container"></div>
+    </div>
+
+    <div class="card">
+        <h3>Spread Grado A − Grado B</h3>
+        <div class="sub">Evolución de la brecha de valor entre grados, en CLP</div>
+        <div id="spreadChart" class="chart-container"></div>
+    </div>
+
+    <div class="card">
+        <h3>Correlación Valor↔Volumen por Modelo</h3>
+        <div class="sub">¿En qué modelos el valor sube cuando hay más actividad?</div>
+        <div id="corrTable" style="max-height:300px;overflow-y:auto;"></div>
+    </div>
+</div>
+
+<script>
+let RAW = null;
+
+fetch('data/processed/curves.json')
+  .then(r => r.json())
+  .then(d => { RAW = d; initCurves(); })
+  .catch(e => console.error('Data load error:', e));
+
+
+const fmt=n=>n.toLocaleString('es-CL');
+const fmtC=n=>n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+Math.round(n/1e3)+'K':'$'+n;
+
+function resetF(){
+  document.getElementById('fModel').value='iPhone 13';
+  document.getElementById('fGrade').value='both';
+  document.getElementById('fDS').value=RAW.dateMin;
+  document.getElementById('fDE').value=RAW.dateMax;
+  render();
+}
+
+function ymOk(ym){
+  const ds=document.getElementById('fDS').value.substring(0,7);
+  const de=document.getElementById('fDE').value.substring(0,7);
+  return(!ds||ym>=ds)&&(!de||ym<=de);
+}
+
+// === TOOLTIP ===
+const tooltip = d3.select('body').append('div')
+  .attr('class', 'd3-tooltip hidden');
+
+function showTooltip(html, x, y) {
+  tooltip.classed('hidden', false)
+    .html(html)
+    .style('left', (x + 10) + 'px')
+    .style('top', (y - 28) + 'px');
+}
+
+function hideTooltip() {
+  tooltip.classed('hidden', true);
+}
+
+// === RENDER CURVE CHART (D3 Line with Shaded Area) ===
+function renderCurveChart(){
+  const model=document.getElementById('fModel').value;
+  const grade=document.getElementById('fGrade').value;
+  const curves=RAW.valCurves.filter(r=>r.Propiedad===model&&ymOk(r.ym));
+
+  const months=[...new Set(curves.map(r=>r.ym))].sort();
+
+  // Clear container
+  d3.select('#curveChart').html('');
+
+  const width=document.getElementById('curveChart').clientWidth || 800;
+  const height=380;
+  const margin={top:20, right:40, bottom:40, left:60};
+  const innerWidth=width-margin.left-margin.right;
+  const innerHeight=height-margin.top-margin.bottom;
+
+  const svg=d3.select('#curveChart').append('svg')
+    .attr('width', width)
+    .attr('height', height);
+
+  const g=svg.append('g')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Scales
+  const xScale=d3.scalePoint().domain(months).range([0, innerWidth]).padding(0.5);
+  const yScale=d3.scaleLinear().range([innerHeight, 0]);
+
+  let data=[{label:'Grado A',values:[]},{label:'Grado B',values:[]}];
+
+  if(grade==='both'){
+    const aData={}, bData={};
+    curves.forEach(r=>{
+      if(r.Grado==='Grado A') aData[r.ym]=r.avg_val;
+      if(r.Grado==='Grado B') bData[r.ym]=r.avg_val;
+    });
+    data[0].values=months.map((m,i)=>({x:m, y:aData[m]||null, i}));
+    data[1].values=months.map((m,i)=>({x:m, y:bData[m]||null, i}));
+  } else {
+    const grado=grade;
+    const dataObj={};
+    curves.filter(r=>r.Grado===grado).forEach(r=>{dataObj[r.ym]=r.avg_val;});
+    const color=grado==='Grado A'?'#10b981':'#ef4444';
+    data=[{label:grado,values:months.map((m,i)=>({x:m, y:dataObj[m]||null, i})),color}];
+  }
+
+  // Find yDomain
+  const allYVals=data.flatMap(d=>d.values.map(v=>v.y)).filter(v=>v!==null);
+  if(allYVals.length>0){
+    const minY=Math.min(...allYVals);
+    const maxY=Math.max(...allYVals);
+    yScale.domain([minY*0.95, maxY*1.05]);
+  }
+
+  // Draw area chart if single grade
+  if(grade!=='both' && data.length===1){
+    const areaGen=d3.area()
+      .x(d=>xScale(d.x))
+      .y0(innerHeight)
+      .y1(d=>d.y!==null?yScale(d.y):null)
+      .defined(d=>d.y!==null);
+
+    const color=data[0].color;
+    const gradient=svg.append('defs').append('linearGradient')
+      .attr('id', 'areaGradient')
+      .attr('x1', '0%').attr('y1', '0%')
+      .attr('x2', '0%').attr('y2', '100%');
+    gradient.append('stop').attr('offset', '0%').attr('stop-color', color).attr('stop-opacity', 0.3);
+    gradient.append('stop').attr('offset', '100%').attr('stop-color', color).attr('stop-opacity', 0.05);
+
+    g.append('path')
+      .attr('d', areaGen(data[0].values))
+      .attr('fill', 'url(#areaGradient)');
+  }
+
+  // Draw shaded area between A and B if both
+  if(grade==='both'){
+    const aVals=data[0].values;
+    const bVals=data[1].values;
+    const areaPath=[];
+    for(let i=0; i<months.length; i++){
+      if(aVals[i].y!==null && bVals[i].y!==null){
+        areaPath.push({x:months[i], yA:aVals[i].y, yB:bVals[i].y});
+      }
+    }
+
+    if(areaPath.length>0){
+      const areaGen=d3.area()
+        .x(d=>xScale(d.x))
+        .y0(d=>yScale(d.yB))
+        .y1(d=>yScale(d.yA));
+
+      const gradient=svg.append('defs').append('linearGradient')
+        .attr('id', 'spreadGradient')
+        .attr('x1', '0%').attr('y1', '0%')
+        .attr('x2', '0%').attr('y2', '100%');
+      gradient.append('stop').attr('offset', '0%').attr('stop-color', '#10b981').attr('stop-opacity', 0.15);
+      gradient.append('stop').attr('offset', '100%').attr('stop-color', '#10b981').attr('stop-opacity', 0.05);
+
+      g.append('path')
+        .attr('d', areaGen(areaPath))
+        .attr('fill', 'url(#spreadGradient)');
+    }
+  }
+
+  // Draw lines
+  const lineGen=d3.line()
+    .x(d=>xScale(d.x))
+    .y(d=>d.y!==null?yScale(d.y):null)
+    .defined(d=>d.y!==null);
+
+  const colors=['#10b981','#ef4444'];
+  data.forEach((d,i)=>{
+    g.append('path')
+      .attr('d', lineGen(d.values))
+      .attr('stroke', d.color||colors[i])
+      .attr('stroke-width', 2.5)
+      .attr('fill', 'none');
+  });
+
+  // Draw points
+  data.forEach((d,i)=>{
+    g.selectAll(`.dot-${i}`)
+      .data(d.values.filter(v=>v.y!==null))
+      .enter().append('circle')
+      .attr('class', `dot-${i}`)
+      .attr('cx', v=>xScale(v.x))
+      .attr('cy', v=>yScale(v.y))
+      .attr('r', 3)
+      .attr('fill', d.color||colors[i])
+      .on('mouseenter', function(evt, v){
+        showTooltip(`<strong>${d.label}</strong><br>${v.x}: ${fmtC(v.y)}`, evt.pageX, evt.pageY);
+      })
+      .on('mouseleave', hideTooltip);
+  });
+
+  // Axes
+  g.append('g')
+    .attr('transform', `translate(0,${innerHeight})`)
+    .call(d3.axisBottom(xScale))
+    .style('font-size', '12px');
+
+  g.append('g')
+    .call(d3.axisLeft(yScale).tickFormat(fmtC))
+    .style('font-size', '12px')
+    .style('color', '#94a3b8');
+
+  // Y-axis label
+  g.append('text')
+    .attr('transform', 'rotate(-90)')
+    .attr('y', 0-margin.left+15)
+    .attr('x', 0-innerHeight/2)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#94a3b8')
+    .attr('font-size', '12px')
+    .text('Valor promedio (CLP)');
+
+  // Grid
+  g.append('g')
+    .attr('class', 'grid')
+    .call(d3.axisLeft(yScale)
+      .tickSize(-innerWidth)
+      .tickFormat('')
+    )
+    .style('stroke', '#1e293b')
+    .style('stroke-width', '0.5px')
+    .style('opacity', 0.5);
+}
+
+// === RENDER DUAL AXIS CHART (Bar + Line) ===
+function renderDualChart(){
+  const model=document.getElementById('fModel').value;
+  const curves=RAW.valCurves.filter(r=>r.Propiedad===model&&ymOk(r.ym));
+  const vol=RAW.volume.filter(r=>ymOk(r.ym));
+
+  const valByMonth={};
+  curves.forEach(r=>{
+    if(!valByMonth[r.ym]){valByMonth[r.ym]={sum:0,count:0};}
+    valByMonth[r.ym].sum+=r.avg_val*r.count;
+    valByMonth[r.ym].count+=r.count;
+  });
+
+  const dualMonths=[...new Set([...Object.keys(valByMonth),...vol.map(r=>r.ym)])].sort();
+  const volMap={};
+  vol.forEach(r=>volMap[r.ym]=r.total_vol);
+
+  // Clear container
+  d3.select('#dualChart').html('');
+
+  const width=document.getElementById('dualChart').clientWidth || 800;
+  const height=340;
+  const margin={top:20, right:60, bottom:40, left:60};
+  const innerWidth=width-margin.left-margin.right;
+  const innerHeight=height-margin.top-margin.bottom;
+
+  const svg=d3.select('#dualChart').append('svg')
+    .attr('width', width)
+    .attr('height', height);
+
+  const g=svg.append('g')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Prepare data
+  const chartData=dualMonths.map(m=>({
+    x:m,
+    val:valByMonth[m]?Math.round(valByMonth[m].sum/valByMonth[m].count):null,
+    vol:volMap[m]||0
+  }));
+
+  // Scales
+  const xScale=d3.scalePoint().domain(dualMonths).range([0, innerWidth]).padding(0.5);
+
+  const valVals=chartData.map(d=>d.val).filter(v=>v!==null);
+  const y1Scale=d3.scaleLinear().range([innerHeight, 0]);
+  if(valVals.length>0){
+    y1Scale.domain([Math.min(...valVals)*0.95, Math.max(...valVals)*1.05]);
+  }
+
+  const volVals=chartData.map(d=>d.vol).filter(v=>v);
+  const y2Scale=d3.scaleLinear().range([innerHeight, 0]);
+  if(volVals.length>0){
+    y2Scale.domain([0, Math.max(...volVals)*1.1]);
+  }
+
+  // Bars (volume)
+  g.selectAll('.bar')
+    .data(chartData)
+    .enter().append('rect')
+    .attr('class', 'bar')
+    .attr('x', d=>xScale(d.x)-15)
+    .attr('y', d=>y2Scale(d.vol))
+    .attr('width', 30)
+    .attr('height', d=>innerHeight-y2Scale(d.vol))
+    .attr('fill', '#f59e0b33')
+    .attr('stroke', '#f59e0b')
+    .attr('stroke-width', 1)
+    .on('mouseenter', function(evt, d){
+      showTooltip(`<strong>Volumen</strong><br>${d.x}: ${fmt(d.vol)}`, evt.pageX, evt.pageY);
+    })
+    .on('mouseleave', hideTooltip);
+
+  // Line (value)
+  const lineGen=d3.line()
+    .x(d=>xScale(d.x))
+    .y(d=>d.val!==null?y1Scale(d.val):null)
+    .defined(d=>d.val!==null);
+
+  g.append('path')
+    .attr('d', lineGen(chartData))
+    .attr('stroke', '#3b82f6')
+    .attr('stroke-width', 2.5)
+    .attr('fill', 'none');
+
+  // Line points
+  g.selectAll('.line-dot')
+    .data(chartData.filter(d=>d.val!==null))
+    .enter().append('circle')
+    .attr('class', 'line-dot')
+    .attr('cx', d=>xScale(d.x))
+    .attr('cy', d=>y1Scale(d.val))
+    .attr('r', 3)
+    .attr('fill', '#3b82f6')
+    .on('mouseenter', function(evt, d){
+      showTooltip(`<strong>${model} valor</strong><br>${d.x}: ${fmtC(d.val)}`, evt.pageX, evt.pageY);
+    })
+    .on('mouseleave', hideTooltip);
+
+  // Axes
+  g.append('g')
+    .attr('transform', `translate(0,${innerHeight})`)
+    .call(d3.axisBottom(xScale))
+    .style('font-size', '12px');
+
+  g.append('g')
+    .call(d3.axisLeft(y1Scale).tickFormat(fmtC))
+    .style('font-size', '12px')
+    .style('color', '#3b82f6');
+
+  g.append('g')
+    .attr('transform', `translate(${innerWidth},0)`)
+    .call(d3.axisRight(y2Scale).tickFormat(fmt))
+    .style('font-size', '12px')
+    .style('color', '#f59e0b');
+
+  // Y-axis labels
+  g.append('text')
+    .attr('transform', 'rotate(-90)')
+    .attr('y', 0-margin.left+15)
+    .attr('x', 0-innerHeight/2)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#3b82f6')
+    .attr('font-size', '12px')
+    .text('Valor Trade-In (CLP)');
+
+  g.append('text')
+    .attr('transform', 'rotate(90)')
+    .attr('y', 0-innerWidth-margin.right+15)
+    .attr('x', innerHeight/2)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#f59e0b')
+    .attr('font-size', '12px')
+    .text('Volumen');
+
+  // Grid
+  g.append('g')
+    .attr('class', 'grid')
+    .call(d3.axisLeft(y1Scale)
+      .tickSize(-innerWidth)
+      .tickFormat('')
+    )
+    .style('stroke', '#1e293b')
+    .style('stroke-width', '0.5px')
+    .style('opacity', 0.5);
+}
+
+// === RENDER SPREAD CHART (Diverging Bar) ===
+function renderSpreadChart(){
+  const model=document.getElementById('fModel').value;
+  const gcurves=RAW.gradingCurves.filter(r=>ymOk(r.ym));
+
+  const spreadByMonth={};
+  gcurves.forEach(r=>{
+    if(!spreadByMonth[r.ym]) spreadByMonth[r.ym]={};
+    spreadByMonth[r.ym][r.grading_clean]=r.avg_val;
+  });
+  const spreadMonths=Object.keys(spreadByMonth).sort();
+  const spreadData=spreadMonths.map(m=>{
+    const a=spreadByMonth[m]['GRADO A'], b=spreadByMonth[m]['GRADO B'];
+    return {x:m, y:(a&&b)?a-b:null};
+  }).filter(d=>d.y!==null);
+
+  // Clear container
+  d3.select('#spreadChart').html('');
+
+  const width=document.getElementById('spreadChart').clientWidth || 400;
+  const height=340;
+  const margin={top:20, right:40, bottom:40, left:60};
+  const innerWidth=width-margin.left-margin.right;
+  const innerHeight=height-margin.top-margin.bottom;
+
+  const svg=d3.select('#spreadChart').append('svg')
+    .attr('width', width)
+    .attr('height', height);
+
+  const g=svg.append('g')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Scales
+  const xScale=d3.scalePoint().domain(spreadData.map(d=>d.x)).range([0, innerWidth]).padding(0.5);
+  const spreadVals=spreadData.map(d=>d.y);
+  const minVal=Math.min(...spreadVals);
+  const maxVal=Math.max(...spreadVals);
+  const yScale=d3.scaleLinear()
+    .domain([minVal<0?minVal*1.1:0, maxVal>0?maxVal*1.1:0])
+    .range([innerHeight, 0]);
+
+  // Center line at 0
+  const zeroY=yScale(0);
+  g.append('line')
+    .attr('x1', 0)
+    .attr('x2', innerWidth)
+    .attr('y1', zeroY)
+    .attr('y2', zeroY)
+    .attr('stroke', '#475569')
+    .attr('stroke-width', 1)
+    .attr('stroke-dasharray', '4,4');
+
+  // Bars
+  const barWidth=innerWidth/(spreadData.length*2);
+  g.selectAll('.spread-bar')
+    .data(spreadData)
+    .enter().append('rect')
+    .attr('class', 'spread-bar')
+    .attr('x', d=>xScale(d.x)-barWidth/2)
+    .attr('y', d=>d.y>0?yScale(d.y):zeroY)
+    .attr('width', barWidth)
+    .attr('height', d=>Math.abs(yScale(d.y)-zeroY))
+    .attr('fill', d=>d.y>0?'#10b981aa':'#ef4444aa')
+    .attr('rx', 4)
+    .on('mouseenter', function(evt, d){
+      showTooltip(`<strong>Spread</strong><br>${d.x}: ${fmtC(d.y)}`, evt.pageX, evt.pageY);
+    })
+    .on('mouseleave', hideTooltip);
+
+  // Axes
+  g.append('g')
+    .attr('transform', `translate(0,${innerHeight})`)
+    .call(d3.axisBottom(xScale))
+    .style('font-size', '12px');
+
+  g.append('g')
+    .call(d3.axisLeft(yScale).tickFormat(fmtC))
+    .style('font-size', '12px')
+    .style('color', '#94a3b8');
+
+  // Grid
+  g.append('g')
+    .attr('class', 'grid')
+    .call(d3.axisLeft(yScale)
+      .tickSize(-innerWidth)
+      .tickFormat('')
+    )
+    .style('stroke', '#1e293b')
+    .style('stroke-width', '0.5px')
+    .style('opacity', 0.5);
+}
+
+// === RENDER CORRELATION TABLE → BUBBLE SCATTER ===
+function renderCorrTable(){
+  const corrs=RAW.correlations.filter(c=>c.n_months>=5).sort((a,b)=>b.corr_val_vol-a.corr_val_vol);
+  const model=document.getElementById('fModel').value;
+
+  // Clear container
+  d3.select('#corrTable').html('');
+
+  const width=document.getElementById('corrTable').clientWidth;
+  const height=300;
+  const margin={top:20, right:40, bottom:40, left:100};
+  const innerWidth=width-margin.left-margin.right;
+  const innerHeight=height-margin.top-margin.bottom;
+
+  const svg=d3.select('#corrTable').append('svg')
+    .attr('width', width)
+    .attr('height', height);
+
+  const g=svg.append('g')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Scales
+  const xScale=d3.scaleLinear().domain([-1, 1]).range([0, innerWidth]);
+  const yScale=d3.scaleBand().domain(corrs.map(c=>c.model)).range([0, innerHeight]).padding(0.5);
+
+  const nMonthVals=corrs.map(c=>c.n_months);
+  const sizeScale=d3.scaleSqrt()
+    .domain([Math.min(...nMonthVals), Math.max(...nMonthVals)])
+    .range([4, 12]);
+
+  // Bubbles
+  g.selectAll('.bubble')
+    .data(corrs)
+    .enter().append('circle')
+    .attr('class', 'bubble')
+    .attr('cx', d=>xScale(d.corr_val_vol))
+    .attr('cy', d=>yScale(d.model)+yScale.bandwidth()/2)
+    .attr('r', d=>sizeScale(d.n_months))
+    .attr('fill', d=>d.corr_val_vol>0?'#10b98155':'#ef444455')
+    .attr('stroke', d=>d.corr_val_vol>0?'#10b981':'#ef4444')
+    .attr('stroke-width', d=>d.model===model?2:1)
+    .attr('opacity', d=>d.model===model?1:0.7)
+    .on('mouseenter', function(evt, d){
+      showTooltip(`<strong>${d.model}</strong><br>Corr: ${d.corr_val_vol.toFixed(2)}<br>Meses: ${d.n_months}`, evt.pageX, evt.pageY);
+    })
+    .on('mouseleave', hideTooltip);
+
+  // Axes
+  g.append('g')
+    .attr('transform', `translate(0,${innerHeight})`)
+    .call(d3.axisBottom(xScale).tickValues([-1,-0.5,0,0.5,1]))
+    .style('font-size', '12px');
+
+  g.append('g')
+    .call(d3.axisLeft(yScale))
+    .style('font-size', '12px')
+    .selectAll('text')
+    .style('font-weight', d=>d===model?'700':'400')
+    .style('fill', '#94a3b8');
+
+  // X-axis label
+  g.append('text')
+    .attr('x', innerWidth/2)
+    .attr('y', innerHeight+35)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#94a3b8')
+    .attr('font-size', '12px')
+    .text('Correlación Valor↔Volumen');
+
+  // Grid
+  g.append('g')
+    .attr('class', 'grid')
+    .call(d3.axisBottom(xScale)
+      .tickSize(innerHeight)
+      .tickFormat('')
+    )
+    .style('stroke', '#1e293b')
+    .style('stroke-width', '0.5px')
+    .style('opacity', 0.3);
+
+  // Center line at 0
+  g.append('line')
+    .attr('x1', xScale(0))
+    .attr('x2', xScale(0))
+    .attr('y1', 0)
+    .attr('y2', innerHeight)
+    .attr('stroke', '#475569')
+    .attr('stroke-width', 1)
+    .attr('stroke-dasharray', '4,4');
+}
+
+function render(){
+  const model=document.getElementById('fModel').value;
+  const grade=document.getElementById('fGrade').value;
+
+  const curves=RAW.valCurves.filter(r=>r.Propiedad===model&&ymOk(r.ym));
+
+  document.getElementById('curveTitle').textContent='Curva de Valor: '+model;
+
+  renderCurveChart();
+  renderDualChart();
+  renderSpreadChart();
+
+  // === KPIs ===
+  const valByMonth={};
+  curves.forEach(r=>{
+    if(!valByMonth[r.ym]){valByMonth[r.ym]={sum:0,count:0};}
+    valByMonth[r.ym].sum+=r.avg_val*r.count;
+    valByMonth[r.ym].count+=r.count;
+  });
+
+  const months=[...new Set(curves.map(r=>r.ym))].sort();
+  const sortedMonths=months.filter(m=>valByMonth[m]);
+
+  if(sortedMonths.length>0){
+    const lastM=sortedMonths[sortedMonths.length-1];
+    const firstM=sortedMonths[0];
+    const lastVal=Math.round(valByMonth[lastM].sum/valByMonth[lastM].count);
+    const firstVal=Math.round(valByMonth[firstM].sum/valByMonth[firstM].count);
+    document.getElementById('kVal').textContent=fmtC(lastVal);
+    document.getElementById('kValS').textContent=lastM;
+    const chg=((lastVal-firstVal)/firstVal*100);
+    document.getElementById('kChange').textContent=(chg>=0?'+':'')+chg.toFixed(1)+'%';
+    document.getElementById('kChange').style.color=chg>=0?'var(--green)':'var(--red)';
+  }
+
+  // Spread KPI
+  const gcurves=RAW.gradingCurves.filter(r=>ymOk(r.ym));
+  const spreadByMonth={};
+  gcurves.forEach(r=>{
+    if(!spreadByMonth[r.ym]) spreadByMonth[r.ym]={};
+    spreadByMonth[r.ym][r.grading_clean]=r.avg_val;
+  });
+  const spreadMonths=Object.keys(spreadByMonth).sort();
+  const spreadVals=spreadMonths.map(m=>{
+    const a=spreadByMonth[m]['GRADO A'], b=spreadByMonth[m]['GRADO B'];
+    return(a&&b)?a-b:null;
+  }).filter(v=>v!==null);
+
+  if(spreadVals.length>0){
+    const avgSpread=Math.round(spreadVals.reduce((a,b)=>a+b,0)/spreadVals.length);
+    document.getElementById('kSpread').textContent=fmtC(avgSpread);
+  } else {
+    document.getElementById('kSpread').textContent='—';
+  }
+
+  // Correlation KPI
+  const corrItem=RAW.correlations.find(c=>c.model===model);
+  if(corrItem){
+    const r=corrItem.corr_val_vol;
+    document.getElementById('kCorr').textContent=r.toFixed(2);
+    document.getElementById('kCorr').style.color=r>0.3?'var(--green)':r<-0.3?'var(--red)':'var(--t2)';
+  } else {
+    document.getElementById('kCorr').textContent='—';
+  }
+
+  // Count KPI
+  const totalCount=curves.reduce((s,r)=>s+r.count,0);
+  document.getElementById('kCount').textContent=fmt(totalCount);
+
+  // Render correlation scatter
+  renderCorrTable();
+
+  document.getElementById('statusLabel').textContent=model+' · '+document.getElementById('fDS').value+' a '+document.getElementById('fDE').value;
+}
+
+// === INIT ===
+function initCurves() {
+  RAW.models.forEach(m=>{
+    const opt=document.createElement('option');
+    opt.value=m;
+    opt.textContent=m;
+    document.getElementById('fModel').appendChild(opt);
+  });
+
+  document.getElementById('fModel').value='iPhone 13';
+  document.getElementById('fGrade').value='both';
+  document.getElementById('fDS').value=RAW.dateMin;
+  document.getElementById('fDE').value=RAW.dateMax;
+
+  render();
+
+  // Ensure date changes trigger re-render
+  ['fDS', 'fDE', 'fModel', 'fGrade'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', render);
+      el.addEventListener('input', render);
+    }
+  });
+}
+
+</script>
+</body>
+</html>

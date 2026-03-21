@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade-In iPhone — Insights Avanzados</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+:root { --bg:#0c111b; --card:#141b2b; --border:#1e293b; --t1:#f1f5f9; --t2:#94a3b8; --t3:#475569; --accent:#3b82f6; --green:#10b981; --red:#ef4444; --amber:#f59e0b; --purple:#a855f7; --pink:#ec4899; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); color:var(--t1); }
+
+nav { background:var(--bg); padding:0 28px; display:flex; align-items:center; border-bottom:1px solid var(--border); font-size:13px; height:44px; gap:0; }
+nav a { color:var(--t3); text-decoration:none; padding:10px 14px; border-bottom:2px solid transparent; display:flex; align-items:center; height:100%; }
+nav a.active { color:var(--t1); border-bottom-color:var(--accent); font-weight:600; }
+nav .back { padding:0 14px 0 0; border-right:1px solid var(--border); margin-right:4px; font-weight:600; }
+
+.hdr { padding:20px 28px 0; display:flex; justify-content:space-between; align-items:end; flex-wrap:wrap; gap:16px; }
+.hdr div:first-child h1 { font-size:22px; font-weight:700; }
+.hdr div:first-child p { color:var(--t2); font-size:13px; margin-top:4px; }
+
+.filters { display:flex; gap:12px; align-items:end; flex-wrap:wrap; padding:12px 28px 16px; }
+.fg { display:flex; flex-direction:column; gap:3px; }
+.fg label { font-size:10px; color:var(--t3); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+.fg input, .fg select { padding:7px 10px; border:1px solid var(--border); border-radius:7px; background:var(--bg); color:var(--t1); font-size:13px; }
+.btn { padding:7px 12px; background:var(--accent); color:white; border:none; border-radius:7px; cursor:pointer; font-weight:600; font-size:13px; }
+.btn:hover { opacity:.8; }
+
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; padding:0 28px 20px; }
+.kp { background:var(--card); padding:14px; border-radius:10px; border:1px solid var(--border); }
+.kp .l { font-size:11px; color:var(--t2); text-transform:uppercase; letter-spacing:.5px; }
+.kp .v { font-size:20px; font-weight:700; margin:4px 0; }
+.kp .s { font-size:11px; color:var(--t3); }
+
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(500px,1fr)); gap:20px; padding:0 28px 28px; }
+.grid .full { grid-column:1/-1; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:18px; }
+.card h3 { font-size:15px; font-weight:600; margin-bottom:4px; }
+.card .sub { font-size:12px; color:var(--t2); margin-bottom:16px; }
+
+svg { display:block; margin:0 auto; }
+.d3-tooltip { position:absolute; padding:8px 12px; background:rgba(0,0,0,.8); color:#fff; border-radius:6px; font-size:12px; pointer-events:none; z-index:1000; }
+
+.hm-container { display:grid; gap:1px; background:var(--border); padding:12px; border-radius:6px; }
+.hm-cell { padding:8px; text-align:center; font-size:12px; font-weight:600; background:var(--border); border-radius:3px; }
+
+.bar-row { display:flex; align-items:center; gap:12px; margin:10px 0; }
+.bar-label { flex:0 0 100px; font-size:12px; color:var(--t2); }
+.bar-track { flex:1; height:24px; background:var(--border); border-radius:4px; overflow:hidden; position:relative; }
+.bar-fill { height:100%; display:flex; align-items:center; justify-content:flex-end; padding-right:8px; color:white; font-size:11px; font-weight:600; }
+.bar-val { flex:0 0 60px; text-align:right; font-size:11px; color:var(--t3); }
+
+@media (max-width:900px) { .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<nav>
+<span class="back">←</span>
+<a href='/' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Dashboard</a>
+<a class='active' href='/insights' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Insights</a>
+<a href='/benchmark' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Benchmark</a>
+<a href="elasticity.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
+</nav>
+
+<div class="hdr"><div><h1>Insights Avanzados</h1><p id="statusLabel">Análisis profundo del programa Trade-In</p></div></div>
+<div class="filters">
+    <div class="fg"><label>Desde</label><input type="date" id="fDS" onchange="render()"></div>
+    <div class="fg"><label>Hasta</label><input type="date" id="fDE" onchange="render()"></div>
+    <div class="fg" style="justify-content:end"><button class="btn" onclick="resetF()">Reset</button></div>
+</div>
+
+<div class="kpis">
+    <div class="kp"><div class="l">Salto Generacional</div><div class="v" style="color:var(--accent)" id="kGen">—</div><div class="s">gen. de salto promedio (ej: 13→16 = 3)</div></div>
+    <div class="kp"><div class="l">Upgrade de Tier</div><div class="v" style="color:var(--green)" id="kTier">—</div><div class="s">sube de gama (ej: Standard → Pro)</div></div>
+    <div class="kp"><div class="l">Upgrade Capacidad</div><div class="v" style="color:var(--purple)" id="kCap">—</div><div class="s">compra más almacenamiento</div></div>
+    <div class="kp"><div class="l">Retención de Valor</div><div class="v" style="color:var(--amber)" id="kRet">—</div><div class="s">del precio nuevo cubre el trade-in</div></div>
+    <div class="kp"><div class="l">Prima Grado A</div><div class="v" style="color:var(--green)" id="kGrade">—</div><div class="s">más que equipo con desgaste (B)</div></div>
+    <div class="kp"><div class="l">Fuga a Otros</div><div class="v" style="color:var(--red)" id="kLeak">—</div><div class="s">usa crédito en iPad, AirPods u otro</div></div>
+</div>
+
+<div class="grid">
+    <div class="card"><h3>Salto Generacional</h3><div class="sub">¿Cuántas generaciones salta el cliente?</div><div id="genChart"></div></div>
+    <div class="card"><h3>Migración de Tier</h3><div class="sub">Standard → Pro, Pro → Pro Max, etc.</div><div id="tierHeatmap"></div></div>
+    <div class="card"><h3>Upgrade de Capacidad</h3><div class="sub">¿Compran más almacenamiento?</div><div id="capChart"></div></div>
+    <div class="card"><h3>Retención de Valor por Modelo</h3><div class="sub">% del precio nuevo que cubre el trade-in</div><div id="retentionBars"></div></div>
+    <div class="card full"><h3>Impacto del Grado en Valor de Return</h3><div class="sub">Diferencia Grado A vs Grado B por modelo</div><div id="gradeChart"></div></div>
+    <div class="card"><h3>Fuga a Otros Productos</h3><div class="sub">Returns sin compra de iPhone, por mes</div><div id="leakChart"></div></div>
+    <div class="card"><h3>Tasa de Fuga por Modelo</h3><div class="sub">% de returns que NO compraron otro iPhone</div><div id="leakRateBars"></div></div>
+</div>
+
+<script>
+let RAW = null;
+
+fetch('data/processed/insights.json')
+  .then(r => r.json())
+  .then(d => { RAW = d; initInsights(); })
+  .catch(e => console.error('Data load error:', e));
+
+// D3 defaults
+
+// Color scheme
+const colors = {
+  bg: '#0c111b',
+  card: '#141b2b',
+  border: '#1e293b',
+  t1: '#f1f5f9',
+  t2: '#94a3b8',
+  t3: '#475569',
+  accent: '#3b82f6',
+  green: '#10b981',
+  red: '#ef4444',
+  amber: '#f59e0b',
+  purple: '#a855f7',
+  pink: '#ec4899',
+};
+
+const fmt = n => n.toLocaleString('es-CL');
+const fmtC = n => n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+Math.round(n/1e3)+'K':'$'+n;
+
+function resetF() {
+    document.getElementById('fDS').value = RAW.dateMin;
+    document.getElementById('fDE').value = RAW.dateMax;
+    render();
+}
+
+function ymInRange(ym) {
+    const dStart = document.getElementById('fDS').value;
+    const dEnd = document.getElementById('fDE').value;
+    return ym >= dStart && ym <= dEnd;
+}
+
+function render() {
+    const filtered = {
+        gen: RAW.gen.filter(d => ymInRange(d.ym)),
+        tier: RAW.tier.filter(d => ymInRange(d.ym)),
+        cap: RAW.cap.filter(d => ymInRange(d.ym)),
+        retention: RAW.retention.filter(d => ymInRange(d.ym)),
+        grade: RAW.grading.filter(d => ymInRange(d.ym)),
+        leak: RAW.leakage.filter(d => ymInRange(d.ym)),
+        leakRate: RAW.leakage.filter(d => ymInRange(d.ym)),
+    };
+
+    renderGen(filtered.gen);
+    renderTier(filtered.tier);
+    renderCap(filtered.cap);
+    renderRetention(filtered.retention);
+    renderGrade(filtered.grade);
+    renderLeak(filtered.leak);
+    renderLeakRate(filtered.leakRate);
+    updateKPIs(filtered);
+}
+
+function updateKPIs(filtered) {
+    // Gen jump average
+    const genAvg = filtered.gen.length ? (filtered.gen.reduce((s,d)=>s+d.gen*d.count,0)/filtered.gen.reduce((s,d)=>s+d.count,0)).toFixed(2) : 0;
+    document.getElementById('kGen').textContent = genAvg;
+
+    // Tier upgrade %
+    const tierTotal = filtered.tier.reduce((s,d)=>s+d.count,0);
+    const tOrder = RAW.tierOrder; const tierUp = filtered.tier.filter(d=>tOrder.indexOf(d.to)>tOrder.indexOf(d.from)).reduce((s,d)=>s+d.count,0);
+    document.getElementById('kTier').textContent = tierTotal ? ((tierUp/tierTotal)*100).toFixed(1)+'%' : '—';
+
+    // Cap upgrade %
+    const capAgg = {Mismo:0,Upgrade:0,Downgrade:0};
+    filtered.cap.forEach(d => { capAgg[d.change] = (capAgg[d.change]||0) + d.count; });
+    const capTotal = capAgg.Mismo + capAgg.Upgrade + capAgg.Downgrade;
+    document.getElementById('kCap').textContent = capTotal ? ((capAgg.Upgrade/capTotal)*100).toFixed(1)+'%' : '—';
+
+    // Retention avg
+    const retAvg = filtered.retention.length ? (filtered.retention.reduce((s,d)=>s+d.avg_ret*d.count,0)/filtered.retention.reduce((s,d)=>s+d.count,0)).toFixed(1) : 0;
+    document.getElementById('kRet').textContent = retAvg + '%';
+
+    // Grade premium
+    const byGrade = {A:0, B:0};
+    filtered.grade.forEach(d => {
+        byGrade[d.from_grading_clean === 'GRADO A' ? 'A' : 'B'] += d.avg_val * d.count;
+    });
+    const gradeCountA = filtered.grade.filter(d=>d.from_grading_clean==='GRADO A').reduce((s,d)=>s+d.count,0);
+    const gradeCountB = filtered.grade.filter(d=>d.from_grading_clean==='GRADO B').reduce((s,d)=>s+d.count,0);
+    const gradePrem = (gradeCountA && gradeCountB) ? (((byGrade.A/gradeCountA)/(byGrade.B/gradeCountB))-1)*100 : 0;
+    document.getElementById('kGrade').textContent = gradePrem.toFixed(1)+'%';
+
+    // Leak %
+    const leakTotal = filtered.leak.reduce((s,d)=>s+d.total,0);
+    const leakNoIphone = filtered.leak.reduce((s,d)=>s+d.leaked,0);
+    document.getElementById('kLeak').textContent = leakTotal ? ((leakNoIphone/leakTotal)*100).toFixed(1)+'%' : '—';
+}
+
+// ===== GEN CHART: Bar + Normal Distribution Curve =====
+function renderGen(data) {
+    d3.select('#genChart').selectAll('svg').remove();
+    
+    const genByVal = {};
+    data.forEach(d => {
+        genByVal[d.gen] = (genByVal[d.gen] || 0) + d.count;
+    });
+    
+    const genData = Object.entries(genByVal).map(([k,v]) => ({gen: parseInt(k), count: v})).sort((a,b)=>a.gen-b.gen);
+    if (genData.length === 0) return;
+
+    const margin = {top:20, right:40, bottom:30, left:50};
+    const width = 500 - margin.left - margin.right;
+    const height = 280 - margin.top - margin.bottom;
+
+    const svg = d3.select('#genChart').append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .attr('viewBox', [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom])
+        .style('background', colors.card);
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const x = d3.scaleBand()
+        .domain(genData.map(d => d.gen))
+        .range([0, width])
+        .padding(0.4);
+
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(genData, d => d.count)])
+        .range([height, 0]);
+
+    // Bar colors by jump category
+    const barColor = gen => {
+        if (gen <= -4) return '#7c3aed'; // purple for huge downgrade
+        if (gen === -3 || gen === -2) return '#ef4444'; // red
+        if (gen === -1) return '#f97316'; // orange
+        if (gen === 0) return '#6b7280'; // gray
+        if (gen === 1 || gen === 2) return '#22c55e'; // light green
+        if (gen === 3 || gen === 4) return '#10b981'; // green
+        if (gen === 5) return '#059669'; // dark green
+        return '#3b82f6'; // blue fallback
+    };
+
+    // X axis
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x))
+        .attr('color', colors.t2)
+        .style('font-size', '12px');
+
+    // Y axis
+    g.append('g')
+        .call(d3.axisLeft(y))
+        .attr('color', colors.t2)
+        .style('font-size', '12px');
+
+    // Bars
+    g.selectAll('.bar')
+        .data(genData)
+        .enter()
+        .append('rect')
+        .attr('class', 'bar')
+        .attr('x', d => x(d.gen))
+        .attr('y', d => y(d.count))
+        .attr('width', x.bandwidth())
+        .attr('height', d => height - y(d.count))
+        .attr('fill', d => barColor(d.gen))
+        .attr('opacity', 0.8);
+
+    // Normal distribution curve overlay
+    const mean = genData.reduce((s,d)=>s+d.gen*d.count,0) / genData.reduce((s,d)=>s+d.count,0);
+    const variance = genData.reduce((s,d)=>s+Math.pow(d.gen-mean,2)*d.count,0) / genData.reduce((s,d)=>s+d.count,0);
+    const stddev = Math.sqrt(variance);
+    
+    const curveData = [];
+    for (let i = -5; i <= 6; i += 0.1) {
+        const prob = (1/(stddev*Math.sqrt(2*Math.PI))) * Math.exp(-0.5*Math.pow((i-mean)/stddev,2));
+        curveData.push({x: i, y: prob * genData.reduce((s,d)=>s+d.count,0)});
+    }
+
+    const line = d3.line()
+        .x(d => x(d.x) + x.bandwidth()/2)
+        .y(d => y(d.y));
+
+    g.append('path')
+        .datum(curveData)
+        .attr('fill', 'none')
+        .attr('stroke', colors.accent)
+        .attr('stroke-width', 2)
+        .attr('d', line)
+        .attr('opacity', 0.6);
+}
+
+// ===== TIER HEATMAP: D3 Matrix =====
+function renderTier(data) {
+    d3.select('#tierHeatmap').selectAll('svg').remove();
+    
+    const tiers = ['Standard', 'Plus', 'Pro', 'Pro Max'];
+    const tierMap = {};
+    data.forEach(d => {
+        if (!tierMap[d.from]) tierMap[d.from] = {};
+        tierMap[d.from][d.to] = (tierMap[d.from][d.to] || 0) + d.count;
+    });
+
+    const heatmapData = [];
+    tiers.forEach(from => {
+        tiers.forEach(to => {
+            const count = tierMap[from]?.[to] || 0;
+            heatmapData.push({from, to, count});
+        });
+    });
+
+    // Calculate row totals for percentage calculation
+    const rowTotals = {};
+    tiers.forEach(from => {
+        rowTotals[from] = tiers.reduce((sum, to) => {
+            return sum + (tierMap[from]?.[to] || 0);
+        }, 0);
+    });
+
+    const margin = {top:20, right:20, bottom:60, left:80};
+    const cellSize = 60;
+    const width = tiers.length * cellSize;
+    const height = tiers.length * cellSize;
+
+    const svg = d3.select('#tierHeatmap').append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .attr('viewBox', [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom])
+        .style('background', colors.card);
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const colorScale = d3.scaleLinear()
+        .domain([
+            d3.min(heatmapData, d => d.count),
+            0,
+            d3.max(heatmapData, d => d.count)
+        ])
+        .range([colors.red, '#1e293b', colors.green]);
+
+    // Create x-axis labels (to tiers)
+    g.selectAll('.x-label')
+        .data(tiers)
+        .enter()
+        .append('text')
+        .attr('class', 'x-label')
+        .attr('x', (d,i) => i * cellSize + cellSize/2)
+        .attr('y', -8)
+        .attr('text-anchor', 'middle')
+        .attr('fill', colors.t2)
+        .style('font-size', '12px')
+        .text(d => d);
+
+    // Create y-axis labels (from tiers)
+    g.selectAll('.y-label')
+        .data(tiers)
+        .enter()
+        .append('text')
+        .attr('class', 'y-label')
+        .attr('x', -8)
+        .attr('y', (d,i) => i * cellSize + cellSize/2)
+        .attr('text-anchor', 'end')
+        .attr('dominant-baseline', 'middle')
+        .attr('fill', colors.t2)
+        .style('font-size', '12px')
+        .text(d => d);
+
+    // Create heatmap cells
+    g.selectAll('.hm-cell')
+        .data(heatmapData)
+        .enter()
+        .append('rect')
+        .attr('class', 'hm-cell')
+        .attr('x', d => tiers.indexOf(d.to) * cellSize)
+        .attr('y', d => tiers.indexOf(d.from) * cellSize)
+        .attr('width', cellSize - 2)
+        .attr('height', cellSize - 2)
+        .attr('fill', d => d.count > 0 ? colorScale(d.count) : '#1e293b')
+        .attr('stroke', colors.border)
+        .attr('stroke-width', 1)
+        .on('mouseover', function(e,d) {
+            d3.select(this).attr('stroke', colors.t1).attr('stroke-width', 2);
+            const tooltip = svg.append('text')
+                .attr('class', 'tooltip')
+                .attr('x', margin.left + tiers.indexOf(d.to) * cellSize + cellSize/2)
+                .attr('y', margin.top + tiers.indexOf(d.from) * cellSize - 5)
+                .attr('text-anchor', 'middle')
+                .attr('fill', colors.t1)
+                .style('font-size', '11px')
+                .style('font-weight', '600')
+                .text(d.count ? fmt(d.count) : '—');
+        })
+        .on('mouseout', function() {
+            d3.select(this).attr('stroke', colors.border).attr('stroke-width', 1);
+            d3.select('text.tooltip').remove();
+        });
+
+    // Add count text on cells
+    g.selectAll('.cell-text')
+        .data(heatmapData.filter(d => d.count > 0))
+        .enter()
+        .append('text')
+        .attr('class', 'cell-text')
+        .attr('x', d => tiers.indexOf(d.to) * cellSize + cellSize/2)
+        .attr('y', d => tiers.indexOf(d.from) * cellSize + cellSize/2)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .attr('fill', colors.t1)
+        .style('font-size', '13px')
+        .style('font-weight', '600')
+        .text(d => {
+            const total = rowTotals[d.from];
+            const pct = total > 0 ? ((d.count / total) * 100).toFixed(0) : '0';
+            return pct + '%';
+        });
+}
+
+// ===== CAP CHART: Waffle Chart =====
+function renderCap(data) {
+    d3.select('#capChart').selectAll('svg').remove();
+    
+    const capAgg = {Mismo: 0, Upgrade: 0, Downgrade: 0};
+    data.forEach(d => {
+        capAgg[d.change] = (capAgg[d.change] || 0) + d.count;
+    });
+
+    const total = capAgg.Mismo + capAgg.Upgrade + capAgg.Downgrade;
+    if (total === 0) return;
+
+    const waffleSize = 10;
+    const cellCount = waffleSize * waffleSize;
+    const cellWidth = total / cellCount;
+
+    const waffleData = [];
+    let idx = 0;
+    for (let cat of Object.keys(capAgg)) {
+        const count = Math.round(capAgg[cat] / cellWidth);
+        for (let i = 0; i < count && idx < cellCount; i++) {
+            waffleData.push({category: cat, idx});
+            idx++;
+        }
+    }
+
+    const margin = {top:20, right:20, bottom:40, left:20};
+    const cellSize = 30;
+    const width = waffleSize * cellSize;
+    const height = waffleSize * cellSize;
+
+    const svg = d3.select('#capChart').append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom + 40)
+        .attr('viewBox', [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom + 40])
+        .style('background', colors.card);
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const catColor = {Mismo: colors.accent, Upgrade: colors.green, Downgrade: colors.red};
+
+    g.selectAll('.waffle-cell')
+        .data(waffleData)
+        .enter()
+        .append('rect')
+        .attr('class', 'waffle-cell')
+        .attr('x', d => (d.idx % waffleSize) * cellSize)
+        .attr('y', d => Math.floor(d.idx / waffleSize) * cellSize)
+        .attr('width', cellSize - 2)
+        .attr('height', cellSize - 2)
+        .attr('fill', d => catColor[d.category])
+        .attr('opacity', 0.8);
+
+    // Legend
+    const legend = svg.append('g').attr('transform', `translate(${margin.left},${margin.top + height + 20})`);
+    const cats = ['Mismo', 'Upgrade', 'Downgrade'];
+    cats.forEach((cat, i) => {
+        const x = i * 150;
+        legend.append('rect')
+            .attr('x', x)
+            .attr('y', 0)
+            .attr('width', 16)
+            .attr('height', 16)
+            .attr('fill', catColor[cat])
+            .attr('opacity', 0.8);
+        legend.append('text')
+            .attr('x', x + 22)
+            .attr('y', 12)
+            .attr('fill', colors.t2)
+            .style('font-size', '12px')
+            .text(cat + ' (' + ((capAgg[cat]/total)*100).toFixed(0) + '%)');
+    });
+}
+
+// ===== RETENTION BARS: Dot Plot =====
+function renderRetention(data) {
+    d3.select('#retentionBars').selectAll('svg').remove();
+    
+    const byModel = {};
+    data.forEach(r => {
+        if(!byModel[r.from_model]) byModel[r.from_model]={sum:0,count:0};
+        byModel[r.from_model].sum += r.avg_ret*r.count;
+        byModel[r.from_model].count += r.count;
+    });
+    const models = Object.entries(byModel).map(([m,d])=>({model:m, avg:d.sum/d.count, count:d.count}))
+        .filter(r=>r.count>=30).sort((a,b)=>b.count-a.count).slice(0,12);
+    
+    if (models.length === 0) return;
+
+    const margin = {top:20, right:80, bottom:30, left:100};
+    const width = 500 - margin.left - margin.right;
+    const height = Math.max(200, models.length * 24);
+
+    const svg = d3.select('#retentionBars').append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .attr('viewBox', [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom])
+        .style('background', colors.card);
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const y = d3.scaleBand()
+        .domain(models.map(d => d.model))
+        .range([0, height])
+        .padding(0.3);
+
+    const x = d3.scaleLinear()
+        .domain([0, 100])
+        .range([0, width]);
+
+    // Y axis labels (models)
+    g.selectAll('.model-label')
+        .data(models)
+        .enter()
+        .append('text')
+        .attr('class', 'model-label')
+        .attr('x', -8)
+        .attr('y', d => y(d.model) + y.bandwidth()/2)
+        .attr('text-anchor', 'end')
+        .attr('dominant-baseline', 'middle')
+        .attr('fill', colors.t2)
+        .style('font-size', '11px')
+        .text(d => d.model);
+
+    // Horizontal lines
+    g.selectAll('.ret-line')
+        .data(models)
+        .enter()
+        .append('line')
+        .attr('class', 'ret-line')
+        .attr('x1', 0)
+        .attr('x2', d => x(d.avg))
+        .attr('y1', d => y(d.model) + y.bandwidth()/2)
+        .attr('y2', d => y(d.model) + y.bandwidth()/2)
+        .attr('stroke', colors.border)
+        .attr('stroke-width', 1);
+
+    // Dots
+    g.selectAll('.ret-dot')
+        .data(models)
+        .enter()
+        .append('circle')
+        .attr('class', 'ret-dot')
+        .attr('cx', d => x(d.avg))
+        .attr('cy', d => y(d.model) + y.bandwidth()/2)
+        .attr('r', 5)
+        .attr('fill', colors.accent);
+
+    // Value labels
+    g.selectAll('.ret-val')
+        .data(models)
+        .enter()
+        .append('text')
+        .attr('class', 'ret-val')
+        .attr('x', d => x(d.avg) + 12)
+        .attr('y', d => y(d.model) + y.bandwidth()/2)
+        .attr('dominant-baseline', 'middle')
+        .attr('fill', colors.t1)
+        .style('font-size', '11px')
+        .style('font-weight', '600')
+        .text(d => d.avg.toFixed(1)+'%');
+
+    // X axis
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).tickFormat(d => d+'%'))
+        .attr('color', colors.t2)
+        .style('font-size', '11px');
+}
+
+// ===== GRADE CHART: Back-to-Back Bar Chart =====
+function renderGrade(data) {
+    d3.select('#gradeChart').selectAll('svg').remove();
+    
+    const byModel = {};
+    data.forEach(r => {
+        if(!byModel[r.from_model]) byModel[r.from_model]={};
+        if(!byModel[r.from_model][r.from_grading_clean]) byModel[r.from_model][r.from_grading_clean]={sum:0,count:0};
+        byModel[r.from_model][r.from_grading_clean].sum += r.avg_val*r.count;
+        byModel[r.from_model][r.from_grading_clean].count += r.count;
+    });
+    const models = Object.keys(byModel).filter(m => byModel[m]['GRADO A']&&byModel[m]['GRADO B']&&(byModel[m]['GRADO A'].count+byModel[m]['GRADO B'].count)>30)
+        .map(m => ({model:m, a:byModel[m]['GRADO A'].sum/byModel[m]['GRADO A'].count, b:byModel[m]['GRADO B'].sum/byModel[m]['GRADO B'].count, countA:byModel[m]['GRADO A'].count, countB:byModel[m]['GRADO B'].count}))
+        .sort((a,b)=>(b.a-b.b)-(a.a-a.b)).slice(0,12);
+
+    if (models.length === 0) return;
+
+    const margin = {top:20, right:80, bottom:30, left:100};
+    const width = 800 - margin.left - margin.right;
+    const height = Math.max(250, models.length * 28);
+
+    const svg = d3.select('#gradeChart').append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .attr('viewBox', [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom])
+        .style('background', colors.card);
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const y = d3.scaleBand()
+        .domain(models.map(d => d.model))
+        .range([0, height])
+        .padding(0.3);
+
+    const maxVal = d3.max(models, d => Math.max(d.a, d.b));
+    const x = d3.scaleLinear()
+        .domain([-maxVal, maxVal])
+        .range([0, width]);
+
+    // Model labels
+    g.selectAll('.model-label')
+        .data(models)
+        .enter()
+        .append('text')
+        .attr('class', 'model-label')
+        .attr('x', -8)
+        .attr('y', d => y(d.model) + y.bandwidth()/2)
+        .attr('text-anchor', 'end')
+        .attr('dominant-baseline', 'middle')
+        .attr('fill', colors.t2)
+        .style('font-size', '11px')
+        .text(d => d.model);
+
+    // Center line
+    g.append('line')
+        .attr('x1', x(0))
+        .attr('x2', x(0))
+        .attr('y1', 0)
+        .attr('y2', height)
+        .attr('stroke', colors.border)
+        .attr('stroke-width', 1);
+
+    // Grado B bars (left, red)
+    g.selectAll('.bar-b')
+        .data(models)
+        .enter()
+        .append('rect')
+        .attr('class', 'bar-b')
+        .attr('x', d => x(-d.b))
+        .attr('y', d => y(d.model))
+        .attr('width', d => x(0) - x(-d.b))
+        .attr('height', y.bandwidth())
+        .attr('fill', colors.red)
+        .attr('opacity', 0.8);
+
+    // Grado A bars (right, green)
+    g.selectAll('.bar-a')
+        .data(models)
+        .enter()
+        .append('rect')
+        .attr('class', 'bar-a')
+        .attr('x', d => x(0))
+        .attr('y', d => y(d.model))
+        .attr('width', d => x(d.a) - x(0))
+        .attr('height', y.bandwidth())
+        .attr('fill', colors.green)
+        .attr('opacity', 0.8);
+
+    // Value labels
+    g.selectAll('.val-b')
+        .data(models)
+        .enter()
+        .append('text')
+        .attr('class', 'val-b')
+        .attr('x', d => x(-d.b) - 4)
+        .attr('y', d => y(d.model) + y.bandwidth()/2)
+        .attr('text-anchor', 'end')
+        .attr('dominant-baseline', 'middle')
+        .attr('fill', colors.t1)
+        .style('font-size', '10px')
+        .style('font-weight', '600')
+        .text(d => d.b.toFixed(0));
+
+    g.selectAll('.val-a')
+        .data(models)
+        .enter()
+        .append('text')
+        .attr('class', 'val-a')
+        .attr('x', d => x(d.a) + 4)
+        .attr('y', d => y(d.model) + y.bandwidth()/2)
+        .attr('text-anchor', 'start')
+        .attr('dominant-baseline', 'middle')
+        .attr('fill', colors.t1)
+        .style('font-size', '10px')
+        .style('font-weight', '600')
+        .text(d => d.a.toFixed(0));
+
+    // X axis
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).tickFormat(d => '$'+Math.abs(Math.round(d))))
+        .attr('color', colors.t2)
+        .style('font-size', '11px');
+
+    // Legend
+    const legend = svg.append('g').attr('transform', `translate(${margin.left},${margin.top + height + 20})`);
+    legend.append('rect').attr('width', 14).attr('height', 14).attr('fill', colors.green).attr('opacity', 0.8);
+    legend.append('text').attr('x', 20).attr('y', 11).attr('fill', colors.t2).style('font-size', '11px').text('Grado A');
+    legend.append('rect').attr('x', 100).attr('width', 14).attr('height', 14).attr('fill', colors.red).attr('opacity', 0.8);
+    legend.append('text').attr('x', 120).attr('y', 11).attr('fill', colors.t2).style('font-size', '11px').text('Grado B');
+}
+
+// ===== LEAK CHART: Bar Chart (Red) =====
+function renderLeak(data) {
+    d3.select('#leakChart').selectAll('svg').remove();
+    
+    const leakByYm = {};
+    data.forEach(d => {
+        leakByYm[d.ym] = (leakByYm[d.ym] || 0) + d.leaked;
+    });
+
+    const leakData = Object.entries(leakByYm).map(([ym, count]) => ({ym, count})).sort((a,b) => a.ym.localeCompare(b.ym));
+    if (leakData.length === 0) return;
+
+    const margin = {top:20, right:40, bottom:40, left:50};
+    const width = 500 - margin.left - margin.right;
+    const height = 250 - margin.top - margin.bottom;
+
+    const svg = d3.select('#leakChart').append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .attr('viewBox', [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom])
+        .style('background', colors.card);
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const x = d3.scaleBand()
+        .domain(leakData.map(d => d.ym))
+        .range([0, width])
+        .padding(0.4);
+
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(leakData, d => d.count)])
+        .range([height, 0]);
+
+    // X axis
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).tickValues(leakData.filter((d,i)=>i%3===0).map(d=>d.ym)))
+        .attr('color', colors.t2)
+        .style('font-size', '11px');
+
+    // Y axis
+    g.append('g')
+        .call(d3.axisLeft(y))
+        .attr('color', colors.t2)
+        .style('font-size', '11px');
+
+    // Bars
+    g.selectAll('.leak-bar')
+        .data(leakData)
+        .enter()
+        .append('rect')
+        .attr('class', 'leak-bar')
+        .attr('x', d => x(d.ym))
+        .attr('y', d => y(d.count))
+        .attr('width', x.bandwidth())
+        .attr('height', d => height - y(d.count))
+        .attr('fill', colors.red)
+        .attr('opacity', 0.8);
+}
+
+// ===== LEAK RATE BARS: Bullet Chart =====
+function renderLeakRate(data) {
+    d3.select('#leakRateBars').selectAll('svg').remove();
+    
+    const byModel = {};
+    data.forEach(r => {
+        if(!byModel[r.from_model]) byModel[r.from_model]={noPhone:0,total:0};
+        byModel[r.from_model].total += r.total;
+        byModel[r.from_model].noPhone += r.leaked;
+    });
+    const models = Object.entries(byModel).map(([m,d])=>({model:m, leakRate: d.total ? (d.noPhone/d.total)*100 : 0}))
+        .filter(r=>r.leakRate>0).sort((a,b)=>b.leakRate-a.leakRate).slice(0,12);
+
+    if (models.length === 0) return;
+
+    const margin = {top:20, right:80, bottom:30, left:100};
+    const width = 500 - margin.left - margin.right;
+    const height = Math.max(200, models.length * 24);
+
+    const svg = d3.select('#leakRateBars').append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .attr('viewBox', [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom])
+        .style('background', colors.card);
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const y = d3.scaleBand()
+        .domain(models.map(d => d.model))
+        .range([0, height])
+        .padding(0.3);
+
+    const x = d3.scaleLinear()
+        .domain([0, 100])
+        .range([0, width]);
+
+    // Model labels
+    g.selectAll('.model-label')
+        .data(models)
+        .enter()
+        .append('text')
+        .attr('class', 'model-label')
+        .attr('x', -8)
+        .attr('y', d => y(d.model) + y.bandwidth()/2)
+        .attr('text-anchor', 'end')
+        .attr('dominant-baseline', 'middle')
+        .attr('fill', colors.t2)
+        .style('font-size', '11px')
+        .text(d => d.model);
+
+    // Background bar (0-100%)
+    g.selectAll('.bg-bar')
+        .data(models)
+        .enter()
+        .append('rect')
+        .attr('class', 'bg-bar')
+        .attr('x', 0)
+        .attr('y', d => y(d.model))
+        .attr('width', width)
+        .attr('height', y.bandwidth())
+        .attr('fill', colors.border)
+        .attr('opacity', 0.3);
+
+    // Leak rate bars (red)
+    g.selectAll('.leak-bar')
+        .data(models)
+        .enter()
+        .append('rect')
+        .attr('class', 'leak-bar')
+        .attr('x', 0)
+        .attr('y', d => y(d.model))
+        .attr('width', d => x(d.leakRate))
+        .attr('height', y.bandwidth())
+        .attr('fill', colors.red)
+        .attr('opacity', 0.8);
+
+    // 10% threshold marker
+    g.append('line')
+        .attr('x1', x(10))
+        .attr('x2', x(10))
+        .attr('y1', 0)
+        .attr('y2', height)
+        .attr('stroke', colors.amber)
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '4,4');
+
+    // Value labels
+    g.selectAll('.leak-val')
+        .data(models)
+        .enter()
+        .append('text')
+        .attr('class', 'leak-val')
+        .attr('x', d => x(d.leakRate) + 6)
+        .attr('y', d => y(d.model) + y.bandwidth()/2)
+        .attr('dominant-baseline', 'middle')
+        .attr('fill', colors.t1)
+        .style('font-size', '11px')
+        .style('font-weight', '600')
+        .text(d => d.leakRate.toFixed(1)+'%');
+
+    // X axis
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).tickFormat(d => d+'%'))
+        .attr('color', colors.t2)
+        .style('font-size', '11px');
+}
+
+function initInsights() {
+    document.getElementById('fDS').value = RAW.dateMin;
+    document.getElementById('fDE').value = RAW.dateMax;
+    render();
+}
+</script>
+</body>
+</html>

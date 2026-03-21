@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade-In iPhone — Explorador de Tendencias</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --bg-header: #1e293b;
+    --border: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #3b82f6;
+    --accent2: #8b5cf6;
+    --positive: #10b981;
+    --negative: #ef4444;
+    --warning: #f59e0b;
+    --gap: 16px;
+    --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; }
+
+.header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 20px 28px; border-bottom: 2px solid var(--accent); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.header h1 { font-size: 22px; font-weight: 700; }
+.header p { color: var(--text-secondary); font-size: 13px; }
+
+.filters { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; padding: 16px 28px; background: var(--bg-card); border-bottom: 1px solid var(--border); }
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-group label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.filter-group select, .filter-group input[type="date"] {
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg-primary); color: var(--text-primary); font-size: 13px; min-width: 160px;
+}
+.filter-group select:focus, .filter-group input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+.filter-group select option { background: var(--bg-primary); }
+
+.btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.15s; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: #2563eb; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+.btn-outline.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--gap); padding: 16px 28px; }
+.kpi { background: var(--bg-card); border-radius: var(--radius); padding: 16px 20px; border: 1px solid var(--border); }
+.kpi .label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+.kpi .value { font-size: 26px; font-weight: 700; margin-top: 2px; }
+.kpi .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); padding: 0 28px 20px; }
+.card { background: var(--bg-card); border-radius: var(--radius); padding: 20px; border: 1px solid var(--border); }
+.card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary); }
+.card .subtitle { font-size: 11px; color: var(--text-muted); margin-top: -8px; margin-bottom: 12px; }
+.full { grid-column: 1 / -1; }
+canvas { max-height: 320px; }
+
+.tab-bar { display: flex; gap: 4px; margin-bottom: 16px; background: var(--bg-primary); padding: 4px; border-radius: 8px; }
+.tab { padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--text-secondary); transition: all 0.15s; border: none; background: none; }
+.tab.active { background: var(--accent); color: white; }
+.tab:hover:not(.active) { color: var(--text-primary); }
+
+.migration-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.migration-table th { text-align: left; padding: 8px 10px; color: var(--text-secondary); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.migration-table td { padding: 8px 10px; border-bottom: 1px solid rgba(51,65,85,0.5); }
+.migration-table tr:hover { background: rgba(59,130,246,0.05); }
+.bar-bg { height: 6px; background: rgba(59,130,246,0.15); border-radius: 3px; }
+.bar-fg { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+
+.empty-state { text-align: center; padding: 40px; color: var(--text-muted); }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.tag-return { background: rgba(239,68,68,0.15); color: #f87171; }
+.tag-purchase { background: rgba(16,185,129,0.15); color: #34d399; }
+
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .filters { flex-direction: column; } }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<nav style="background:#0c111b;padding:0 28px;display:flex;align-items:center;border-bottom:1px solid #1e293b;font-family:'DM Sans',-apple-system,sans-serif;font-size:13px;height:44px;gap:0;">
+<a href="index.html" style="color:#475569;text-decoration:none;font-weight:600;padding:0 14px 0 0;border-right:1px solid #1e293b;margin-right:4px;display:flex;align-items:center;gap:4px;height:100%;">
+<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Hub</a>
+<a href="dashboard.html" class="nav-link" id="nav-dashboard" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Dashboard</a>
+<a href="explorer.html" class="nav-link" id="nav-explorer" style="color:#f1f5f9;text-decoration:none;padding:10px 14px;border-bottom:2px solid #3b82f6;font-weight:600;display:flex;align-items:center;gap:5px;height:100%;">Explorer</a>
+<a href="sankey.html" class="nav-link" id="nav-sankey" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Sankey</a>
+<a href="insights.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Insights</a>
+<a href="curves.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Curvas</a>
+<a href="benchmark.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Benchmark</a>
+<a href="elasticity.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
+</nav>
+
+
+<div class="header">
+    <div>
+        <h1>Trade-In iPhone — Explorador de Tendencias</h1>
+        <p id="rangeLabel">Selecciona un modelo y rango de fechas para explorar</p>
+    </div>
+</div>
+
+<div class="filters">
+    <div class="filter-group">
+        <label>Modelo iPhone</label>
+        <select id="modelSelect" onchange="dashboard.applyFilters()">
+            <option value="all">Todos los modelos</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>Evento</label>
+        <select id="eventSelect" onchange="dashboard.applyFilters()">
+            <option value="all">Entregas + Compras</option>
+            <option value="return">Solo Entregas</option>
+            <option value="purchase">Solo Compras</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>Desde</label>
+        <input type="date" id="dateStart" onchange="dashboard.applyFilters()">
+    </div>
+    <div class="filter-group">
+        <label>Hasta</label>
+        <input type="date" id="dateEnd" onchange="dashboard.applyFilters()">
+    </div>
+    <div class="filter-group" style="justify-content:end">
+        <button class="btn btn-outline" onclick="dashboard.resetFilters()">Reset</button>
+    </div>
+</div>
+
+<div class="kpi-row">
+    <div class="kpi"><div class="label">Total Transacciones</div><div class="value" id="kpiTotal" style="color:var(--accent)">—</div><div class="sub" id="kpiTotalSub"></div></div>
+    <div class="kpi"><div class="label">Entregados</div><div class="value" id="kpiReturns" style="color:var(--negative)">—</div><div class="sub" id="kpiReturnsSub"></div></div>
+    <div class="kpi"><div class="label">Comprados</div><div class="value" id="kpiPurchases" style="color:var(--positive)">—</div><div class="sub" id="kpiPurchasesSub"></div></div>
+    <div class="kpi"><div class="label">Valor Prom. Return</div><div class="value" id="kpiAvgReturn" style="color:var(--warning)">—</div><div class="sub">valor promedio CLP</div></div>
+    <div class="kpi"><div class="label">Valor Prom. Purchase</div><div class="value" id="kpiAvgPurchase" style="color:var(--positive)">—</div><div class="sub">valor promedio CLP</div></div>
+</div>
+
+<div class="grid">
+    <!-- VOLUME TREND -->
+    <div class="card full">
+        <h3>Tendencia Mensual de Volumen</h3>
+        <p class="subtitle">Cantidad de transacciones por mes en el rango seleccionado</p>
+        <div id="volumeChart"></div>
+    </div>
+
+    <!-- SEASONALITY: MONTH OF YEAR -->
+    <div class="card">
+        <h3>Estacionalidad — Mes del Año</h3>
+        <p class="subtitle">Promedio de transacciones agrupadas por mes calendario</p>
+        <div id="seasonMonthChart"></div>
+    </div>
+
+    <!-- SEASONALITY: DAY OF WEEK -->
+    <div class="card">
+        <h3>Estacionalidad — Día de la Semana</h3>
+        <p class="subtitle">Total de transacciones agrupadas por día</p>
+        <div id="seasonDowChart"></div>
+    </div>
+
+    <!-- YEAR-OVER-YEAR COMPARISON -->
+    <div class="card full">
+        <h3>Comparación Año contra Año</h3>
+        <p class="subtitle">Volumen mensual separado por año para detectar patrones repetitivos</p>
+        <div id="yoyChart"></div>
+    </div>
+
+    <!-- VALUE TREND -->
+    <div class="card full">
+        <h3>Tendencia de Valor Promedio</h3>
+        <p class="subtitle">Evolución del valor promedio de los equipos (CLP)</p>
+        <div id="valueChart"></div>
+    </div>
+
+    <!-- CAPACITY -->
+    <div class="card">
+        <h3>Distribución de Capacidad</h3>
+        <div id="capacityChart"></div>
+    </div>
+
+    <!-- TOP MIGRATION -->
+    <div class="card">
+        <h3 id="migrationTitle">Principales Rutas de Migración</h3>
+        <p class="subtitle">Top destinos de upgrade (o fuentes si es Purchase)</p>
+        <div id="migrationTable"></div>
+    </div>
+</div>
+
+<script>
+let RAW = null;
+
+const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16'];
+const MONTHS_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const DOWS_ES = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+function fmt(n) { return n.toLocaleString('es-CL'); }
+function fmtCLP(n) {
+    if (n >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return '$' + (n/1e3).toFixed(0) + 'K';
+    return '$' + n.toFixed(0);
+}
+fetch('data/processed/explorer.json')
+  .then(r => r.json())
+  .then(d => { RAW = d; initExplorer(); })
+  .catch(e => console.error('Data load error:', e));
+
+class Dashboard {
+    constructor() {
+        this.charts = {};
+        this.populateFilters();
+        this.setDefaultDates();
+        this.createTooltip();
+        this.applyFilters();
+    }
+
+    createTooltip() {
+        if (!document.getElementById('d3-tooltip')) {
+            const tooltip = document.createElement('div');
+            tooltip.id = 'd3-tooltip';
+            tooltip.style.cssText = `
+                position: fixed; 
+                background: rgba(30,41,59,0.95); 
+                color: #e2e8f0; 
+                padding: 8px 12px; 
+                border-radius: 6px; 
+                font-size: 12px;
+                pointer-events: none; 
+                display: none;
+                z-index: 1000;
+                border: 1px solid #334155;
+                backdrop-filter: blur(4px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            `;
+            document.body.appendChild(tooltip);
+        }
+    }
+
+    showTooltip(html, x, y) {
+        const tooltip = document.getElementById('d3-tooltip');
+        tooltip.innerHTML = html;
+        tooltip.style.display = 'block';
+        tooltip.style.left = (x + 12) + 'px';
+        tooltip.style.top = (y - 28) + 'px';
+    }
+
+    hideTooltip() {
+        const tooltip = document.getElementById('d3-tooltip');
+        tooltip.style.display = 'none';
+    }
+
+    populateFilters() {
+        const sel = document.getElementById('modelSelect');
+        RAW.models.forEach(m => {
+            const o = document.createElement('option');
+            o.value = m; o.textContent = m;
+            sel.appendChild(o);
+        });
+    }
+
+    setDefaultDates() {
+        document.getElementById('dateStart').value = '2023-07-01';
+        document.getElementById('dateEnd').value = RAW.dateMax;
+    }
+
+    resetFilters() {
+        document.getElementById('modelSelect').value = 'all';
+        document.getElementById('eventSelect').value = 'all';
+        this.setDefaultDates();
+        this.applyFilters();
+    }
+
+    getFilters() {
+        return {
+            model: document.getElementById('modelSelect').value,
+            event: document.getElementById('eventSelect').value,
+            start: document.getElementById('dateStart').value,
+            end: document.getElementById('dateEnd').value,
+        };
+    }
+
+    filterMonthly(f) {
+        return RAW.monthly.filter(r => {
+            if (f.model !== 'all' && r.Propiedad !== f.model) return false;
+            if (f.event !== 'all' && r.event !== f.event) return false;
+            const ym = r.ym;
+            if (f.start && ym < f.start.substring(0,7)) return false;
+            if (f.end && ym > f.end.substring(0,7)) return false;
+            return true;
+        });
+    }
+
+    filterSeason(data, f) {
+        return data.filter(r => {
+            if (f.model !== 'all' && r.Propiedad !== f.model) return false;
+            if (f.event !== 'all' && r.event !== f.event) return false;
+            return true;
+        });
+    }
+
+    filterMigration(f) {
+        return RAW.migration.filter(r => {
+            if (f.start && r.ym < f.start.substring(0,7)) return false;
+            if (f.end && r.ym > f.end.substring(0,7)) return false;
+            if (f.model !== 'all') {
+                if (f.event === 'purchase') return r.to_model === f.model;
+                return r.from_model === f.model;
+            }
+            return true;
+        });
+    }
+
+    applyFilters() {
+        const f = this.getFilters();
+        const monthly = this.filterMonthly(f);
+        const seasonM = this.filterSeason(RAW.seasonMonth, f);
+        const seasonD = this.filterSeason(RAW.seasonDow, f);
+        const migration = this.filterMigration(f);
+        const capData = RAW.capacity.filter(r => {
+            if (f.model !== 'all' && r.Propiedad !== f.model) return false;
+            if (f.event !== 'all' && r.event !== f.event) return false;
+            return true;
+        });
+
+        this.renderKPIs(monthly);
+        this.renderVolumeChart(monthly);
+        this.renderSeasonMonth(seasonM);
+        this.renderSeasonDow(seasonD);
+        this.renderYoY(monthly);
+        this.renderValueChart(monthly);
+        this.renderCapacity(capData);
+        this.renderMigration(migration, f);
+        this.updateLabel(f);
+    }
+
+    updateLabel(f) {
+        const model = f.model === 'all' ? 'Todos los modelos' : f.model;
+        const event = f.event === 'all' ? 'Returns + Purchases' : f.event === 'return' ? 'Returns' : 'Purchases';
+        document.getElementById('rangeLabel').textContent = `${model} · ${event} · ${f.start} a ${f.end}`;
+    }
+
+    renderKPIs(data) {
+        const returns = data.filter(r => r.event === 'return');
+        const purchases = data.filter(r => r.event === 'purchase');
+        const totalRet = returns.reduce((s,r) => s + r.count, 0);
+        const totalPur = purchases.reduce((s,r) => s + r.count, 0);
+        const totalAll = totalRet + totalPur;
+
+        document.getElementById('kpiTotal').textContent = fmt(totalAll);
+        document.getElementById('kpiReturns').textContent = fmt(totalRet);
+        document.getElementById('kpiPurchases').textContent = fmt(totalPur);
+
+        const retValTotal = returns.reduce((s,r) => s + r.total_value, 0);
+        const purValTotal = purchases.reduce((s,r) => s + r.total_value, 0);
+        document.getElementById('kpiAvgReturn').textContent = totalRet > 0 ? fmtCLP(retValTotal / totalRet) : '—';
+        document.getElementById('kpiAvgPurchase').textContent = totalPur > 0 ? fmtCLP(purValTotal / totalPur) : '—';
+
+        const months = [...new Set(data.map(r => r.ym))].length;
+        document.getElementById('kpiTotalSub').textContent = `en ${months} meses`;
+        document.getElementById('kpiReturnsSub').textContent = totalRet > 0 ? `${(totalRet/months).toFixed(0)}/mes promedio` : '';
+        document.getElementById('kpiPurchasesSub').textContent = totalPur > 0 ? `${(totalPur/months).toFixed(0)}/mes promedio` : '';
+    }
+
+    renderVolumeChart(data) {
+        const byYM = {};
+        data.forEach(r => {
+            if (!byYM[r.ym]) byYM[r.ym] = {return: 0, purchase: 0};
+            byYM[r.ym][r.event] += r.count;
+        });
+        const labels = Object.keys(byYM).sort();
+        const chartData = labels.map(l => ({ month: l, returns: byYM[l].return, purchases: byYM[l].purchase }));
+
+        const container = document.getElementById('volumeChart');
+        container.innerHTML = '';
+        
+        const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+        const width = 900 - margin.left - margin.right;
+        const height = 320 - margin.top - margin.bottom;
+        
+        const svg = d3.select(container)
+            .append('svg')
+            .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+            .attr('style', 'width: 100%; height: auto;')
+            .append('g')
+            .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleBand().domain(chartData.map(d => d.month)).range([0, width]).padding(0.2);
+        const x1 = d3.scaleBand().domain(['returns', 'purchases']).range([0, x.bandwidth()]).padding(0.05);
+        const y = d3.scaleLinear().domain([0, d3.max(chartData, d => Math.max(d.returns, d.purchases))]).range([height, 0]);
+
+        svg.append('g').attr('transform', `translate(0,${height})`)
+            .call(d3.axisBottom(x).tickSize(0))
+            .attr('color', '#94a3b8')
+            .selectAll('text').attr('font-size', '12px').attr('fill', '#94a3b8');
+
+        svg.append('g')
+            .call(d3.axisLeft(y).tickSize(-width))
+            .attr('color', '#334155')
+            .selectAll('text').attr('fill', '#94a3b8').attr('font-size', '12px');
+
+        svg.selectAll('.tick line').attr('stroke', '#334155').attr('stroke-dasharray', '2,2');
+        svg.selectAll('.domain').attr('stroke', '#334155');
+
+        const groups = svg.selectAll('g.group')
+            .data(chartData)
+            .enter().append('g')
+            .attr('class', 'group')
+            .attr('transform', d => `translate(${x(d.month)},0)`);
+
+        groups.append('rect')
+            .attr('x', d => x1('returns'))
+            .attr('y', d => y(d.returns))
+            .attr('width', x1.bandwidth())
+            .attr('height', d => height - y(d.returns))
+            .attr('fill', '#ef4444')
+            .attr('rx', 4)
+            .on('mouseover', (e, d) => this.showTooltip(`Returns: ${fmt(d.returns)}`, e.clientX, e.clientY))
+            .on('mouseout', () => this.hideTooltip());
+
+        groups.append('rect')
+            .attr('x', d => x1('purchases'))
+            .attr('y', d => y(d.purchases))
+            .attr('width', x1.bandwidth())
+            .attr('height', d => height - y(d.purchases))
+            .attr('fill', '#10b981')
+            .attr('rx', 4)
+            .on('mouseover', (e, d) => this.showTooltip(`Purchases: ${fmt(d.purchases)}`, e.clientX, e.clientY))
+            .on('mouseout', () => this.hideTooltip());
+    }
+
+    renderSeasonMonth(data) {
+        const byMonth = {};
+        data.forEach(r => {
+            byMonth[r.month] = (byMonth[r.month] || 0) + r.count;
+        });
+        const years = new Set();
+        RAW.monthly.forEach(r => { const y = r.ym.substring(0,4); years.add(y); });
+        const nYears = years.size || 1;
+        
+        const chartData = [];
+        for (let i = 1; i <= 12; i++) {
+            chartData.push({ month: i, label: MONTHS_ES[i-1], value: Math.round((byMonth[i] || 0) / nYears) });
+        }
+
+        const container = document.getElementById('seasonMonthChart');
+        container.innerHTML = '';
+
+        const width = 360;
+        const height = 320;
+        const radius = Math.min(width, height) / 2 - 40;
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        const svg = d3.select(container)
+            .append('svg')
+            .attr('viewBox', `0 0 ${width} ${height}`)
+            .attr('style', 'width: 100%; height: auto;')
+            .append('g')
+            .attr('transform', `translate(${centerX},${centerY})`);
+
+        const maxValue = d3.max(chartData, d => d.value);
+        const angleSlice = (Math.PI * 2) / 12;
+        const rScale = d3.scaleLinear().domain([0, maxValue]).range([0, radius]);
+
+        const peakMonth = chartData.reduce((a, b) => a.value > b.value ? a : b);
+
+        chartData.forEach((d, i) => {
+            const angle = angleSlice * i - Math.PI / 2;
+            const r = rScale(d.value);
+            const x = r * Math.cos(angle);
+            const y = r * Math.sin(angle);
+            const labelR = radius + 30;
+            const labelX = labelR * Math.cos(angle);
+            const labelY = labelR * Math.sin(angle);
+
+            const color = d.month === peakMonth.month ? '#ef4444' : '#3b82f6';
+            
+            svg.append('line')
+                .attr('x1', 0).attr('y1', 0)
+                .attr('x2', x).attr('y2', y)
+                .attr('stroke', '#334155').attr('stroke-width', 1);
+
+            svg.append('rect')
+                .attr('x', x - 8).attr('y', y - 8)
+                .attr('width', 16).attr('height', 16)
+                .attr('fill', color)
+                .attr('opacity', 0.8)
+                .attr('rx', 2)
+                .on('mouseover', (e) => this.showTooltip(`${d.label}: ${fmt(d.value)}`, e.clientX, e.clientY))
+                .on('mouseout', () => this.hideTooltip());
+
+            svg.append('text')
+                .attr('x', labelX).attr('y', labelY)
+                .attr('text-anchor', 'middle').attr('dy', '0.35em')
+                .attr('fill', '#94a3b8').attr('font-size', '12px')
+                .attr('font-weight', '500')
+                .text(d.label);
+        });
+
+        svg.append('circle')
+            .attr('r', radius)
+            .attr('fill', 'none')
+            .attr('stroke', '#334155')
+            .attr('stroke-width', 1)
+            .attr('stroke-dasharray', '2,2');
+    }
+
+    renderSeasonDow(data) {
+        const byDow = {};
+        data.forEach(r => { byDow[r.dow] = (byDow[r.dow] || 0) + r.count; });
+        const chartData = DOWS_ES.map((label, i) => ({ dow: i, label, value: byDow[i] || 0 }));
+
+        const container = document.getElementById('seasonDowChart');
+        container.innerHTML = '';
+
+        const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+        const width = 400 - margin.left - margin.right;
+        const height = 300 - margin.top - margin.bottom;
+
+        const svg = d3.select(container)
+            .append('svg')
+            .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+            .attr('style', 'width: 100%; height: auto;')
+            .append('g')
+            .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleBand().domain(DOWS_ES).range([0, width]).padding(0.2);
+        const y = d3.scaleLinear().domain([0, d3.max(chartData, d => d.value)]).range([height, 0]);
+
+        svg.append('g').attr('transform', `translate(0,${height})`)
+            .call(d3.axisBottom(x).tickSize(0))
+            .attr('color', '#94a3b8')
+            .selectAll('text').attr('font-size', '12px').attr('fill', '#94a3b8');
+
+        svg.append('g')
+            .call(d3.axisLeft(y).tickSize(-width))
+            .attr('color', '#334155')
+            .selectAll('text').attr('fill', '#94a3b8').attr('font-size', '12px');
+
+        svg.selectAll('.tick line').attr('stroke', '#334155').attr('stroke-dasharray', '2,2');
+        svg.selectAll('.domain').attr('stroke', '#334155');
+
+        svg.selectAll('.bar')
+            .data(chartData)
+            .enter().append('rect')
+            .attr('class', 'bar')
+            .attr('x', d => x(d.label))
+            .attr('y', d => y(d.value))
+            .attr('width', x.bandwidth())
+            .attr('height', d => height - y(d.value))
+            .attr('fill', '#8b5cf6')
+            .attr('rx', 4)
+            .on('mouseover', (e, d) => this.showTooltip(`${d.label}: ${fmt(d.value)}`, e.clientX, e.clientY))
+            .on('mouseout', () => this.hideTooltip());
+    }
+
+    renderYoY(data) {
+        const byYearMonth = {};
+        data.forEach(r => {
+            const y = r.ym.substring(0,4);
+            const m = parseInt(r.ym.substring(5,7));
+            if (!byYearMonth[y]) byYearMonth[y] = {};
+            byYearMonth[y][m] = (byYearMonth[y][m] || 0) + r.count;
+        });
+        
+        const years = Object.keys(byYearMonth).sort();
+        const chartData = Array.from({length: 12}, (_, m) => {
+            const monthData = { month: m + 1, label: MONTHS_ES[m] };
+            years.forEach(y => { monthData[y] = byYearMonth[y][m + 1] || 0; });
+            return monthData;
+        });
+
+        const container = document.getElementById('yoyChart');
+        container.innerHTML = '';
+
+        const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+        const width = 900 - margin.left - margin.right;
+        const height = 320 - margin.top - margin.bottom;
+
+        const svg = d3.select(container)
+            .append('svg')
+            .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+            .attr('style', 'width: 100%; height: auto;')
+            .append('g')
+            .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleLinear().domain([1, 12]).range([0, width]);
+        const y = d3.scaleLinear().domain([0, d3.max(chartData, d => d3.max(years, y => d[y]))]).range([height, 0]);
+
+        svg.append('g').attr('transform', `translate(0,${height})`)
+            .call(d3.axisBottom(x).tickFormat(i => MONTHS_ES[i - 1]).tickValues(d3.range(1, 13)))
+            .attr('color', '#94a3b8')
+            .selectAll('text').attr('font-size', '12px').attr('fill', '#94a3b8');
+
+        svg.append('g')
+            .call(d3.axisLeft(y).tickSize(-width))
+            .attr('color', '#334155')
+            .selectAll('text').attr('fill', '#94a3b8').attr('font-size', '12px');
+
+        svg.selectAll('.tick line').attr('stroke', '#334155').attr('stroke-dasharray', '2,2');
+        svg.selectAll('.domain').attr('stroke', '#334155');
+
+        years.forEach((year, i) => {
+            const line = d3.line()
+                .x(d => x(d.month))
+                .y(d => y(d[year]));
+
+            svg.append('path')
+                .datum(chartData)
+                .attr('fill', 'none')
+                .attr('stroke', COLORS[i % COLORS.length])
+                .attr('stroke-width', 2.5)
+                .attr('d', line);
+
+            svg.selectAll(`.dots-${i}`)
+                .data(chartData)
+                .enter().append('circle')
+                .attr('cx', d => x(d.month))
+                .attr('cy', d => y(d[year]))
+                .attr('r', 3)
+                .attr('fill', COLORS[i % COLORS.length])
+                .on('mouseover', (e, d) => this.showTooltip(`${year} - ${d.label}: ${fmt(d[year])}`, e.clientX, e.clientY))
+                .on('mouseout', () => this.hideTooltip());
+        });
+
+        const legend = svg.selectAll('.legend')
+            .data(years)
+            .enter().append('g')
+            .attr('class', 'legend')
+            .attr('transform', (d, i) => `translate(${i * 100}, -10)`);
+
+        legend.append('rect')
+            .attr('width', 18).attr('height', 2)
+            .attr('fill', (d, i) => COLORS[i % COLORS.length]);
+
+        legend.append('text')
+            .attr('x', 24).attr('y', 5)
+            .attr('fill', '#94a3b8')
+            .attr('font-size', '12px')
+            .text(d => d);
+    }
+
+    renderValueChart(data) {
+        const byYM = {};
+        data.forEach(r => {
+            if (!byYM[r.ym]) byYM[r.ym] = { retVal: 0, retCount: 0, purVal: 0, purCount: 0 };
+            if (r.event === 'return') { byYM[r.ym].retVal += r.total_value; byYM[r.ym].retCount += r.count; }
+            else { byYM[r.ym].purVal += r.total_value; byYM[r.ym].purCount += r.count; }
+        });
+        const labels = Object.keys(byYM).sort();
+        const chartData = labels.map(l => ({
+            month: l,
+            retAvg: byYM[l].retCount > 0 ? Math.round(byYM[l].retVal / byYM[l].retCount) : null,
+            purAvg: byYM[l].purCount > 0 ? Math.round(byYM[l].purVal / byYM[l].purCount) : null
+        }));
+
+        const container = document.getElementById('valueChart');
+        container.innerHTML = '';
+
+        const margin = { top: 20, right: 20, bottom: 40, left: 60 };
+        const width = 900 - margin.left - margin.right;
+        const height = 320 - margin.top - margin.bottom;
+
+        const svg = d3.select(container)
+            .append('svg')
+            .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+            .attr('style', 'width: 100%; height: auto;')
+            .append('g')
+            .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        const defs = svg.append('defs');
+        const redGradient = defs.append('linearGradient').attr('id', 'redGrad').attr('x2', '0%').attr('y2', '100%');
+        redGradient.append('stop').attr('offset', '0%').attr('stop-color', '#ef4444').attr('stop-opacity', 0.5);
+        redGradient.append('stop').attr('offset', '100%').attr('stop-color', '#ef4444').attr('stop-opacity', 0);
+
+        const greenGradient = defs.append('linearGradient').attr('id', 'greenGrad').attr('x2', '0%').attr('y2', '100%');
+        greenGradient.append('stop').attr('offset', '0%').attr('stop-color', '#10b981').attr('stop-opacity', 0.5);
+        greenGradient.append('stop').attr('offset', '100%').attr('stop-color', '#10b981').attr('stop-opacity', 0);
+
+        const validData = chartData.filter(d => d.retAvg !== null || d.purAvg !== null);
+        const maxVal = d3.max(validData, d => Math.max(d.retAvg || 0, d.purAvg || 0));
+
+        const x = d3.scalePoint().domain(chartData.map(d => d.month)).range([0, width]);
+        const y = d3.scaleLinear().domain([0, maxVal]).range([height, 0]);
+
+        svg.append('g').attr('transform', `translate(0,${height})`)
+            .call(d3.axisBottom(x).tickSize(0))
+            .attr('color', '#94a3b8')
+            .selectAll('text').attr('font-size', '12px').attr('fill', '#94a3b8').attr('transform', 'rotate(45)').attr('text-anchor', 'start');
+
+        svg.append('g')
+            .call(d3.axisLeft(y).tickSize(-width).tickFormat(d => fmtCLP(d)))
+            .attr('color', '#334155')
+            .selectAll('text').attr('fill', '#94a3b8').attr('font-size', '12px');
+
+        svg.selectAll('.tick line').attr('stroke', '#334155').attr('stroke-dasharray', '2,2');
+        svg.selectAll('.domain').attr('stroke', '#334155');
+
+        const lineRet = d3.line()
+            .defined(d => d.retAvg !== null)
+            .x(d => x(d.month))
+            .y(d => y(d.retAvg));
+
+        const areRet = d3.area()
+            .defined(d => d.retAvg !== null)
+            .x(d => x(d.month))
+            .y0(height)
+            .y1(d => y(d.retAvg));
+
+        svg.append('path')
+            .datum(chartData)
+            .attr('fill', 'url(#redGrad)')
+            .attr('d', areRet);
+
+        svg.append('path')
+            .datum(chartData)
+            .attr('fill', 'none')
+            .attr('stroke', '#ef4444')
+            .attr('stroke-width', 2)
+            .attr('d', lineRet);
+
+        const linePur = d3.line()
+            .defined(d => d.purAvg !== null)
+            .x(d => x(d.month))
+            .y(d => y(d.purAvg));
+
+        const arePur = d3.area()
+            .defined(d => d.purAvg !== null)
+            .x(d => x(d.month))
+            .y0(height)
+            .y1(d => y(d.purAvg));
+
+        svg.append('path')
+            .datum(chartData)
+            .attr('fill', 'url(#greenGrad)')
+            .attr('d', arePur);
+
+        svg.append('path')
+            .datum(chartData)
+            .attr('fill', 'none')
+            .attr('stroke', '#10b981')
+            .attr('stroke-width', 2)
+            .attr('d', linePur);
+
+        svg.selectAll('.dotRet')
+            .data(chartData.filter(d => d.retAvg !== null))
+            .enter().append('circle')
+            .attr('cx', d => x(d.month))
+            .attr('cy', d => y(d.retAvg))
+            .attr('r', 3)
+            .attr('fill', '#ef4444')
+            .on('mouseover', (e, d) => this.showTooltip(`Return: ${fmtCLP(d.retAvg)}`, e.clientX, e.clientY))
+            .on('mouseout', () => this.hideTooltip());
+
+        svg.selectAll('.dotPur')
+            .data(chartData.filter(d => d.purAvg !== null))
+            .enter().append('circle')
+            .attr('cx', d => x(d.month))
+            .attr('cy', d => y(d.purAvg))
+            .attr('r', 3)
+            .attr('fill', '#10b981')
+            .on('mouseover', (e, d) => this.showTooltip(`Purchase: ${fmtCLP(d.purAvg)}`, e.clientX, e.clientY))
+            .on('mouseout', () => this.hideTooltip());
+
+        const legend = svg.append('g').attr('transform', `translate(0, -15)`);
+        legend.append('line').attr('x1', 0).attr('x2', 15).attr('y1', 0).attr('y2', 0).attr('stroke', '#ef4444').attr('stroke-width', 2);
+        legend.append('text').attr('x', 20).attr('fill', '#94a3b8').attr('font-size', '12px').text('Return');
+        legend.append('line').attr('x1', 100).attr('x2', 115).attr('y1', 0).attr('y2', 0).attr('stroke', '#10b981').attr('stroke-width', 2);
+        legend.append('text').attr('x', 120).attr('fill', '#94a3b8').attr('font-size', '12px').text('Purchase');
+    }
+
+    renderCapacity(data) {
+        const byCap = {};
+        data.forEach(r => { byCap[r.Capacidad] = (byCap[r.Capacidad] || 0) + r.count; });
+        const order = ['64GB','128GB','256GB','512GB','1TB','2TB'];
+        const labels = order.filter(c => byCap[c]);
+        const chartData = labels.map((l, i) => ({ capacity: l, count: byCap[l] || 0, color: COLORS[i % COLORS.length] }));
+
+        const container = document.getElementById('capacityChart');
+        container.innerHTML = '';
+
+        const width = 360;
+        const height = 320;
+        const radius = Math.min(width, height) / 2 - 40;
+
+        const svg = d3.select(container)
+            .append('svg')
+            .attr('viewBox', `0 0 ${width} ${height}`)
+            .attr('style', 'width: 100%; height: auto;')
+            .append('g')
+            .attr('transform', `translate(${width/2},${height/2})`);
+
+        const pie = d3.pie().value(d => d.count);
+        const arc = d3.arc().innerRadius(radius * 0.6).outerRadius(radius);
+        const arcHover = d3.arc().innerRadius(radius * 0.6).outerRadius(radius + 8);
+
+        svg.selectAll('path')
+            .data(pie(chartData))
+            .enter().append('path')
+            .attr('d', arc)
+            .attr('fill', d => d.data.color)
+            .attr('stroke', '#1e293b')
+            .attr('stroke-width', 2)
+            .style('cursor', 'pointer')
+            .on('mouseover', function(e, d) {
+                d3.select(this).transition().duration(200).attr('d', arcHover);
+                const total = chartData.reduce((s, c) => s + c.count, 0);
+                const pct = (d.data.count / total * 100).toFixed(1);
+                dashboard.showTooltip(`${d.data.capacity}: ${fmt(d.data.count)} (${pct}%)`, e.clientX, e.clientY);
+            })
+            .on('mouseout', function() {
+                d3.select(this).transition().duration(200).attr('d', arc);
+                dashboard.hideTooltip();
+            });
+
+        svg.selectAll('text')
+            .data(pie(chartData))
+            .enter().append('text')
+            .attr('transform', d => {
+                const a = (d.startAngle + d.endAngle) / 2 - Math.PI / 2;
+                const x = Math.cos(a) * (radius + 30);
+                const y = Math.sin(a) * (radius + 30);
+                return `translate(${x},${y})`;
+            })
+            .attr('text-anchor', 'middle')
+            .attr('fill', '#94a3b8')
+            .attr('font-size', '12px')
+            .attr('font-weight', '500')
+            .text(d => d.data.capacity);
+    }
+
+    renderMigration(data, f) {
+        const agg = {};
+        data.forEach(r => {
+            const key = r.from_model + '→' + r.to_model;
+            if (!agg[key]) agg[key] = { from: r.from_model, to: r.to_model, count: 0 };
+            agg[key].count += r.count;
+        });
+        const sorted = Object.values(agg).sort((a,b) => b.count - a.count).slice(0, 12);
+        const maxC = sorted.length > 0 ? sorted[0].count : 1;
+
+        const title = document.getElementById('migrationTitle');
+        if (f.model !== 'all') {
+            if (f.event === 'purchase') title.textContent = `¿De dónde vienen los ${f.model}?`;
+            else title.textContent = `¿A dónde migran los ${f.model}?`;
+        } else {
+            title.textContent = 'Principales Rutas de Migración';
+        }
+
+        const container = document.getElementById('migrationTable');
+        if (sorted.length === 0) {
+            container.innerHTML = '<div class="empty-state">Sin datos de migración para esta selección</div>';
+            return;
+        }
+        let html = '<table class="migration-table"><thead><tr><th>Entrega</th><th>Compra</th><th>Qty</th><th></th></tr></thead><tbody>';
+        sorted.forEach(r => {
+            const pct = (r.count / maxC * 100).toFixed(1);
+            html += `<tr><td><span class="tag tag-return">${r.from}</span></td><td><span class="tag tag-purchase">${r.to}</span></td><td>${fmt(r.count)}</td><td style="width:35%"><div class="bar-bg"><div class="bar-fg" style="width:${pct}%"></div></div></td></tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    destroyChart(id) {
+        const container = document.getElementById(id);
+        if (container) container.innerHTML = '';
+    }
+}
+
+function initExplorer() {
+    const dashboard = new Dashboard();
+}
+
+// Load data and initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        if (RAW) initExplorer();
+    });
+} else if (RAW) {
+    initExplorer();
+}
+</script>
+</body>
+</html>

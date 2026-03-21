@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade-In iPhone - Dashboard Estadístico</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; }
+.header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 24px 32px; border-bottom: 2px solid #3b82f6; }
+.header h1 { font-size: 24px; font-weight: 700; color: #f8fafc; }
+.header p { color: #94a3b8; margin-top: 4px; font-size: 14px; }
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; padding: 20px 32px; }
+.kpi { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; }
+.kpi .label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+.kpi .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+.kpi .value.blue { color: #3b82f6; }
+.kpi .value.green { color: #10b981; }
+.kpi .value.red { color: #ef4444; }
+.kpi .value.yellow { color: #f59e0b; }
+.kpi .sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 0 32px 20px; }
+.card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; }
+.card h3 { font-size: 14px; font-weight: 600; color: #f1f5f9; margin-bottom: 12px; }
+.full-width { grid-column: 1 / -1; }
+svg { max-height: 350px; }
+.migration-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.migration-table th { text-align: left; padding: 8px; color: #94a3b8; border-bottom: 1px solid #334155; font-weight: 500; }
+.migration-table td { padding: 8px; border-bottom: 1px solid #1e293b; }
+.migration-table tr:hover { background: #334155; }
+.bar-fill { height: 8px; border-radius: 4px; background: linear-gradient(90deg, #3b82f6, #8b5cf6); }
+.filter-bar { padding: 12px 32px; display: flex; gap: 12px; align-items: center; }
+.filter-bar select { background: #1e293b; color: #e2e8f0; border: 1px solid #475569; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+.filter-bar label { font-size: 13px; color: #94a3b8; }
+.insights { background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%); border: 1px solid #3b82f6; border-radius: 12px; padding: 20px; margin: 0 32px 20px; }
+.insights h3 { color: #60a5fa; margin-bottom: 10px; }
+.insights ul { list-style: none; padding: 0; }
+.insights li { padding: 6px 0; font-size: 13px; color: #cbd5e1; }
+.insights li::before { content: "→ "; color: #3b82f6; font-weight: bold; }
+.tooltip { position: absolute; background: rgba(0,0,0,0.8); color: #e2e8f0; padding: 8px 12px; border-radius: 6px; font-size: 12px; pointer-events: none; z-index: 9999; display: none; border: 1px solid #475569; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<nav style="background:#0c111b;padding:0 28px;display:flex;align-items:center;border-bottom:1px solid #1e293b;font-family:'DM Sans',-apple-system,sans-serif;font-size:13px;height:44px;gap:0;">
+<a href="index.html" style="color:#475569;text-decoration:none;font-weight:600;padding:0 14px 0 0;border-right:1px solid #1e293b;margin-right:4px;display:flex;align-items:center;gap:4px;height:100%;">
+<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Hub</a>
+<a href="dashboard.html" class="nav-link" id="nav-dashboard" style="color:#f1f5f9;text-decoration:none;padding:10px 14px;border-bottom:2px solid #3b82f6;font-weight:600;display:flex;align-items:center;gap:5px;height:100%;">Dashboard</a>
+<a href="explorer.html" class="nav-link" id="nav-explorer" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Explorer</a>
+<a href="sankey.html" class="nav-link" id="nav-sankey" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Sankey</a>
+<a href="insights.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Insights</a>
+<a href="curves.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Curvas</a>
+<a href="benchmark.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Benchmark</a>
+<a href="elasticity.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
+</nav>
+
+<div class="header">
+    <h1>📱 Trade-In iPhone — Dashboard Estadístico</h1>
+    <p>2023-07-01 a 2026-03-08 · 22,105 transacciones · 11,900 trade-ins únicos</p>
+</div>
+
+<div class="kpi-row">
+    <div class="kpi">
+        <div class="label">Trade-Ins Únicos</div>
+        <div class="value blue">11,900</div>
+    </div>
+    <div class="kpi">
+        <div class="label">Valor Prom. Entregado</div>
+        <div class="value red">$447,693</div>
+        <div class="sub">CLP — equipo entregado</div>
+    </div>
+    <div class="kpi">
+        <div class="label">Valor Prom. Comprado</div>
+        <div class="value green">$1,298,791</div>
+        <div class="sub">CLP — equipo nuevo</div>
+    </div>
+    <div class="kpi">
+        <div class="label">Costo Adicional</div>
+        <div class="value yellow">$849,990</div>
+        <div class="sub">mediana CLP que paga el cliente</div>
+    </div>
+</div>
+
+<div class="insights">
+    <h3>Hallazgos Clave</h3>
+    <ul>
+        <li><strong>Pico estacional en Oct-Dic 2024</strong> coincide con lanzamiento iPhone 16. Octubre 2024 fue el mes récord con 2,458 transacciones (z-score 3.31)</li>
+        <li><strong>iPhone 16 Pro y Pro Max dominan las compras</strong> (40% combinado). Los clientes prefieren fuertemente los modelos Pro al hacer upgrade</li>
+        <li><strong>La ruta de migración #1 es iPhone 14 Pro Max → iPhone 16 Pro Max</strong> (595 trade-ins), seguida por iPhone 14 Pro → iPhone 16 Pro (550)</li>
+        <li><strong>iPhone 13 es el modelo más devuelto</strong> (15.4% de returns), indicando un ciclo de vida de ~2-3 generaciones antes del trade-in</li>
+        <li><strong>Diferencial mediano de $849,990 CLP</strong> — el cliente típico paga ~$850K adicionales sobre el valor de su equipo devuelto</li>
+        <li><strong>256GB es la capacidad preferida</strong> tanto en returns como en compras, con tendencia creciente hacia 512GB en modelos nuevos</li>
+    </ul>
+</div>
+
+<div class="grid">
+    <div class="card full-width">
+        <h3>Volumen Mensual de Trade-Ins</h3>
+        <div id="volumeChart"></div>
+    </div>
+
+    <div class="card">
+        <h3>Top 10 Modelos Entregados</h3>
+        <div id="returnChart"></div>
+    </div>
+    <div class="card">
+        <h3>Top 10 Modelos Comprados</h3>
+        <div id="purchaseChart"></div>
+    </div>
+
+    <div class="card full-width">
+        <h3>Top 15 Rutas de Migración (Return → Purchase)</h3>
+        <div style="overflow-x:auto;">
+        <table class="migration-table">
+            <thead><tr><th>Modelo Entregado</th><th>Modelo Comprado</th><th>Cantidad</th><th></th></tr></thead>
+            <tbody id="migrationBody"></tbody>
+        </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Distribución de Capacidad</h3>
+        <div id="capacityChart"></div>
+    </div>
+    <div class="card">
+        <h3>Distribución por Grado</h3>
+        <div class="sub" style="font-size:11px;color:#64748b;margin-top:-8px;margin-bottom:8px;">A = buen estado · B = desgaste normal</div>
+        <div id="gradeChart"></div>
+    </div>
+
+    <div class="card full-width">
+        <h3>Evolución Trimestral — Top Modelos Comprados</h3>
+        <div id="quarterChart"></div>
+    </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+let DATA = null; // Will be loaded from data/processed/dashboard.json
+
+const tooltip = d3.select('#tooltip');
+
+// ============= VOLUME CHART - Grouped Bar =============
+function renderVolumeChart() {
+    const data = DATA.volume.labels.map((label, i) => ({
+        month: label,
+        returns: DATA.volume.returns[i],
+        purchases: DATA.volume.purchases[i]
+    }));
+
+    const margin = { top: 20, right: 20, bottom: 60, left: 50 };
+    const width = 800 - margin.left - margin.right;
+    const height = 300 - margin.top - margin.bottom;
+
+    const svg = d3.select('#volumeChart').append('svg')
+        .attr('viewBox', `0 0 800 300`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .style('width', '100%');
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const x0 = d3.scaleBand().domain(data.map(d => d.month)).rangeRound([0, width]).padding(0.1);
+    const x1 = d3.scaleBand().domain(['returns', 'purchases']).rangeRound([0, x0.bandwidth()]).padding(0.05);
+    const y = d3.scaleLinear().domain([0, d3.max(data, d => Math.max(d.returns, d.purchases))]).rangeRound([height, 0]);
+
+    const colors = { returns: '#ef4444', purchases: '#10b981' };
+
+    // Bars
+    const bars = g.selectAll('.bar-group').data(data).enter().append('g')
+        .attr('class', 'bar-group')
+        .attr('transform', d => `translate(${x0(d.month)},0)`);
+
+    bars.selectAll('rect').data(d => [
+        { key: 'returns', value: d.returns },
+        { key: 'purchases', value: d.purchases }
+    ]).enter().append('rect')
+        .attr('x', d => x1(d.key))
+        .attr('y', d => y(d.value))
+        .attr('width', x1.bandwidth())
+        .attr('height', d => height - y(d.value))
+        .attr('fill', d => colors[d.key])
+        .attr('rx', 3)
+        .style('opacity', 0.85)
+        .on('mouseover', function(event, d) {
+            tooltip.style('display', 'block')
+                .html(`<strong>${d.key === 'returns' ? 'Returns' : 'Purchases'}</strong><br/>${d.value}`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mousemove', function(event) {
+            tooltip.style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mouseout', function() {
+            tooltip.style('display', 'none');
+        });
+
+    // X axis
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x0))
+        .selectAll('text')
+        .attr('transform', 'rotate(45)')
+        .attr('text-anchor', 'start')
+        .style('font-size', '11px')
+        .style('fill', '#94a3b8');
+
+    // Y axis
+    g.append('g')
+        .call(d3.axisLeft(y))
+        .style('font-size', '11px')
+        .selectAll('text')
+        .style('fill', '#94a3b8');
+
+    // Axis lines
+    g.selectAll('.domain').style('stroke', '#334155').style('stroke-width', '1px');
+    g.selectAll('.tick line').style('stroke', '#334155').style('stroke-width', '0.5px');
+}
+
+// ============= RETURN CHART - Lollipop =============
+function renderReturnChart() {
+    const data = DATA.topReturns.labels.map((label, i) => ({
+        model: label,
+        value: DATA.topReturns.values[i]
+    })).sort((a, b) => a.value - b.value);
+
+    const margin = { top: 20, right: 40, bottom: 20, left: 120 };
+    const width = 400 - margin.left - margin.right;
+    const height = 320 - margin.top - margin.bottom;
+
+    const svg = d3.select('#returnChart').append('svg')
+        .attr('viewBox', `0 0 400 320`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .style('width', '100%');
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const y = d3.scaleBand().domain(data.map(d => d.model)).rangeRound([height, 0]).padding(0.3);
+    const x = d3.scaleLinear().domain([0, d3.max(data, d => d.value)]).rangeRound([0, width]);
+
+    // Lines (lollipop sticks)
+    g.selectAll('.lollipop-line').data(data).enter().append('line')
+        .attr('class', 'lollipop-line')
+        .attr('x1', 0)
+        .attr('x2', d => x(d.value))
+        .attr('y1', d => y(d.model) + y.bandwidth() / 2)
+        .attr('y2', d => y(d.model) + y.bandwidth() / 2)
+        .attr('stroke', '#ef4444')
+        .attr('stroke-width', 2);
+
+    // Circles (lollipop heads)
+    g.selectAll('.lollipop-circle').data(data).enter().append('circle')
+        .attr('class', 'lollipop-circle')
+        .attr('cx', d => x(d.value))
+        .attr('cy', d => y(d.model) + y.bandwidth() / 2)
+        .attr('r', 5)
+        .attr('fill', '#ef4444')
+        .on('mouseover', function(event, d) {
+            tooltip.style('display', 'block')
+                .html(`<strong>${d.model}</strong><br/>${d.value}`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mousemove', function(event) {
+            tooltip.style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mouseout', function() {
+            tooltip.style('display', 'none');
+        });
+
+    // Y axis (model labels)
+    g.append('g')
+        .call(d3.axisLeft(y))
+        .style('font-size', '11px')
+        .selectAll('text')
+        .style('fill', '#94a3b8');
+
+    // X axis
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x))
+        .style('font-size', '10px')
+        .selectAll('text')
+        .style('fill', '#94a3b8');
+
+    g.selectAll('.domain').style('stroke', '#334155').style('stroke-width', '1px');
+    g.selectAll('.tick line').style('stroke', '#334155').style('stroke-width', '0.5px');
+}
+
+// ============= PURCHASE CHART - Lollipop =============
+function renderPurchaseChart() {
+    const data = DATA.topPurchases.labels.map((label, i) => ({
+        model: label,
+        value: DATA.topPurchases.values[i]
+    })).sort((a, b) => a.value - b.value);
+
+    const margin = { top: 20, right: 40, bottom: 20, left: 120 };
+    const width = 400 - margin.left - margin.right;
+    const height = 320 - margin.top - margin.bottom;
+
+    const svg = d3.select('#purchaseChart').append('svg')
+        .attr('viewBox', `0 0 400 320`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .style('width', '100%');
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const y = d3.scaleBand().domain(data.map(d => d.model)).rangeRound([height, 0]).padding(0.3);
+    const x = d3.scaleLinear().domain([0, d3.max(data, d => d.value)]).rangeRound([0, width]);
+
+    // Lines
+    g.selectAll('.lollipop-line').data(data).enter().append('line')
+        .attr('class', 'lollipop-line')
+        .attr('x1', 0)
+        .attr('x2', d => x(d.value))
+        .attr('y1', d => y(d.model) + y.bandwidth() / 2)
+        .attr('y2', d => y(d.model) + y.bandwidth() / 2)
+        .attr('stroke', '#10b981')
+        .attr('stroke-width', 2);
+
+    // Circles
+    g.selectAll('.lollipop-circle').data(data).enter().append('circle')
+        .attr('class', 'lollipop-circle')
+        .attr('cx', d => x(d.value))
+        .attr('cy', d => y(d.model) + y.bandwidth() / 2)
+        .attr('r', 5)
+        .attr('fill', '#10b981')
+        .on('mouseover', function(event, d) {
+            tooltip.style('display', 'block')
+                .html(`<strong>${d.model}</strong><br/>${d.value}`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mousemove', function(event) {
+            tooltip.style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mouseout', function() {
+            tooltip.style('display', 'none');
+        });
+
+    // Y axis
+    g.append('g')
+        .call(d3.axisLeft(y))
+        .style('font-size', '11px')
+        .selectAll('text')
+        .style('fill', '#94a3b8');
+
+    // X axis
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x))
+        .style('font-size', '10px')
+        .selectAll('text')
+        .style('fill', '#94a3b8');
+
+    g.selectAll('.domain').style('stroke', '#334155').style('stroke-width', '1px');
+    g.selectAll('.tick line').style('stroke', '#334155').style('stroke-width', '0.5px');
+}
+
+// ============= MIGRATION TABLE =============
+function renderMigrationTable() {
+    const maxMig = Math.max(...DATA.migration.map(m => m.Count));
+    document.getElementById('migrationBody').innerHTML = DATA.migration.map(m =>
+        `<tr><td style="color:#ef4444">${m.From}</td><td style="color:#10b981">${m.To}</td><td>${m.Count}</td><td style="width:40%"><div class="bar-fill" style="width:${(m.Count/maxMig*100).toFixed(1)}%"></div></td></tr>`
+    ).join('');
+}
+
+// ============= CAPACITY CHART - Grouped Bar =============
+function renderCapacityChart() {
+    const data = DATA.capacity.labels.map((label, i) => ({
+        capacity: label,
+        returns: DATA.capacity.returns[i],
+        purchases: DATA.capacity.purchases[i]
+    }));
+
+    const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+    const width = 400 - margin.left - margin.right;
+    const height = 280 - margin.top - margin.bottom;
+
+    const svg = d3.select('#capacityChart').append('svg')
+        .attr('viewBox', `0 0 400 280`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .style('width', '100%');
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const x0 = d3.scaleBand().domain(data.map(d => d.capacity)).rangeRound([0, width]).padding(0.1);
+    const x1 = d3.scaleBand().domain(['returns', 'purchases']).rangeRound([0, x0.bandwidth()]).padding(0.05);
+    const y = d3.scaleLinear().domain([0, d3.max(data, d => Math.max(d.returns, d.purchases))]).rangeRound([height, 0]);
+
+    const colors = { returns: '#ef4444', purchases: '#10b981' };
+
+    const bars = g.selectAll('.bar-group').data(data).enter().append('g')
+        .attr('class', 'bar-group')
+        .attr('transform', d => `translate(${x0(d.capacity)},0)`);
+
+    bars.selectAll('rect').data(d => [
+        { key: 'returns', value: d.returns },
+        { key: 'purchases', value: d.purchases }
+    ]).enter().append('rect')
+        .attr('x', d => x1(d.key))
+        .attr('y', d => y(d.value))
+        .attr('width', x1.bandwidth())
+        .attr('height', d => height - y(d.value))
+        .attr('fill', d => colors[d.key])
+        .attr('rx', 3)
+        .style('opacity', 0.85)
+        .on('mouseover', function(event, d) {
+            tooltip.style('display', 'block')
+                .html(`<strong>${d.key === 'returns' ? 'Returns' : 'Purchases'}</strong><br/>${d.value}`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mousemove', function(event) {
+            tooltip.style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mouseout', function() {
+            tooltip.style('display', 'none');
+        });
+
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x0))
+        .style('font-size', '11px')
+        .selectAll('text')
+        .style('fill', '#94a3b8');
+
+    g.append('g')
+        .call(d3.axisLeft(y))
+        .style('font-size', '11px')
+        .selectAll('text')
+        .style('fill', '#94a3b8');
+
+    g.selectAll('.domain').style('stroke', '#334155').style('stroke-width', '1px');
+    g.selectAll('.tick line').style('stroke', '#334155').style('stroke-width', '0.5px');
+}
+
+// ============= GRADE CHART - Butterfly/Diverging Bar =============
+function renderGradeChart() {
+    const data = [
+        { grade: 'Grado A', returns: DATA.grade.returnA, purchases: DATA.grade.purchaseA },
+        { grade: 'Grado B', returns: DATA.grade.returnB, purchases: DATA.grade.purchaseB }
+    ];
+
+    const margin = { top: 20, right: 40, bottom: 40, left: 80 };
+    const width = 400 - margin.left - margin.right;
+    const height = 200 - margin.top - margin.bottom;
+
+    const svg = d3.select('#gradeChart').append('svg')
+        .attr('viewBox', `0 0 400 200`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .style('width', '100%');
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const y = d3.scaleBand().domain(data.map(d => d.grade)).rangeRound([height, 0]).padding(0.4);
+    const maxVal = d3.max(data, d => Math.max(d.returns, d.purchases));
+    const x = d3.scaleLinear().domain([-maxVal, maxVal]).rangeRound([0, width]);
+
+    // Returns bars (left, negative)
+    g.selectAll('.bar-returns').data(data).enter().append('rect')
+        .attr('class', 'bar-returns')
+        .attr('x', d => x(-d.returns))
+        .attr('y', d => y(d.grade))
+        .attr('width', d => x(0) - x(-d.returns))
+        .attr('height', y.bandwidth())
+        .attr('fill', '#ef4444')
+        .style('opacity', 0.85)
+        .on('mouseover', function(event, d) {
+            tooltip.style('display', 'block')
+                .html(`<strong>Returns</strong><br/>${d.returns}`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mousemove', function(event) {
+            tooltip.style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mouseout', function() {
+            tooltip.style('display', 'none');
+        });
+
+    // Purchases bars (right, positive)
+    g.selectAll('.bar-purchases').data(data).enter().append('rect')
+        .attr('class', 'bar-purchases')
+        .attr('x', x(0))
+        .attr('y', d => y(d.grade))
+        .attr('width', d => x(d.purchases) - x(0))
+        .attr('height', y.bandwidth())
+        .attr('fill', '#10b981')
+        .style('opacity', 0.85)
+        .on('mouseover', function(event, d) {
+            tooltip.style('display', 'block')
+                .html(`<strong>Purchases</strong><br/>${d.purchases}`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mousemove', function(event) {
+            tooltip.style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mouseout', function() {
+            tooltip.style('display', 'none');
+        });
+
+    // Center line
+    g.append('line')
+        .attr('x1', x(0))
+        .attr('x2', x(0))
+        .attr('y1', 0)
+        .attr('y2', height)
+        .attr('stroke', '#334155')
+        .attr('stroke-width', 1);
+
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x))
+        .style('font-size', '10px')
+        .selectAll('text')
+        .style('fill', '#94a3b8');
+
+    g.append('g')
+        .call(d3.axisLeft(y))
+        .style('font-size', '11px')
+        .selectAll('text')
+        .style('fill', '#94a3b8');
+
+    g.selectAll('.domain').style('stroke', '#334155').style('stroke-width', '1px');
+    g.selectAll('.tick line').style('stroke', '#334155').style('stroke-width', '0.5px');
+}
+
+// ============= QUARTER CHART - Streamgraph =============
+function renderQuarterChart() {
+    const quarters = DATA.quarterModels.quarters;
+    const models = DATA.quarterModels.models;
+
+    // Transform data for stacking
+    const stackData = quarters.map((quarter, i) => {
+        const obj = { quarter };
+        Object.keys(models).forEach(model => {
+            obj[model] = models[model][i];
+        });
+        return obj;
+    });
+
+    const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+    const width = 750 - margin.left - margin.right;
+    const height = 320 - margin.top - margin.bottom;
+
+    const svg = d3.select('#quarterChart').append('svg')
+        .attr('viewBox', `0 0 750 320`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .style('width', '100%');
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const x = d3.scalePoint().domain(quarters).rangeRound([0, width]).padding(0.5);
+    const y = d3.scaleLinear().domain([0, d3.max(stackData, d => {
+        return Object.keys(models).reduce((sum, m) => sum + d[m], 0);
+    })]).rangeRound([height, 0]);
+
+    const color = d3.scaleOrdinal()
+        .domain(Object.keys(models))
+        .range(['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']);
+
+    const stack = d3.stack().keys(Object.keys(models));
+    const stackedData = stack(stackData);
+
+    const area = d3.area()
+        .x(d => x(d.data.quarter))
+        .y0(d => y(d[0]))
+        .y1(d => y(d[1]))
+        .curve(d3.curveBasis);
+
+    g.selectAll('.stream-path').data(stackedData).enter().append('path')
+        .attr('class', 'stream-path')
+        .attr('d', area)
+        .attr('fill', d => color(d.key))
+        .style('opacity', 0.8)
+        .on('mouseover', function(event, d) {
+            tooltip.style('display', 'block')
+                .html(`<strong>${d.key}</strong>`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mousemove', function(event) {
+            tooltip.style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mouseout', function() {
+            tooltip.style('display', 'none');
+        });
+
+    g.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x))
+        .style('font-size', '11px')
+        .selectAll('text')
+        .style('fill', '#94a3b8');
+
+    g.append('g')
+        .call(d3.axisLeft(y))
+        .style('font-size', '11px')
+        .selectAll('text')
+        .style('fill', '#94a3b8');
+
+    g.selectAll('.domain').style('stroke', '#334155').style('stroke-width', '1px');
+    g.selectAll('.tick line').style('stroke', '#334155').style('stroke-width', '0.5px');
+}
+
+// Initialize dashboard - called after data is loaded
+function initDashboard() {
+    renderVolumeChart();
+    renderReturnChart();
+    renderPurchaseChart();
+    renderMigrationTable();
+    renderCapacityChart();
+    renderGradeChart();
+    renderQuarterChart();
+}
+
+// Load data from external JSON and initialize
+fetch('data/processed/dashboard.json')
+    .then(r => r.json())
+    .then(d => { 
+        DATA = d; 
+        initDashboard(); 
+    })
+    .catch(e => console.error('Data load error:', e));
+</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade-In iPhone — Analytics Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'DM Sans', -apple-system, sans-serif; background: #0c111b; color: #e2e8f0; min-height: 100vh; }
+
+.hero { padding: 72px 32px 40px; max-width: 1000px; margin: 0 auto; }
+.hero h1 { font-size: 42px; font-weight: 700; color: #f8fafc; letter-spacing: -0.5px; line-height: 1.1; }
+.hero h1 span { color: #60a5fa; }
+.hero p { color: #64748b; font-size: 16px; margin-top: 12px; max-width: 520px; line-height: 1.6; }
+.hero .stats { display: flex; gap: 32px; margin-top: 28px; }
+.hero .stat-val { font-size: 28px; font-weight: 700; color: #f8fafc; }
+.hero .stat-lbl { font-size: 12px; color: #475569; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 1000px; margin: 0 auto; padding: 20px 32px 80px; }
+.card {
+    background: #141b2b; border: 1px solid #1e293b; border-radius: 14px;
+    padding: 28px; text-decoration: none; color: inherit; transition: all 0.2s;
+    display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden;
+}
+.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.card:nth-child(1)::before { background: #3b82f6; }
+.card:nth-child(2)::before { background: #10b981; }
+.card:nth-child(3)::before { background: #a855f7; }
+.card:nth-child(4)::before { background: #f59e0b; }
+.card:nth-child(5)::before { background: #ec4899; }
+.card:nth-child(6)::before { background: #06b6d4; }
+.card:hover { border-color: #334155; transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+.card-num { font-size: 11px; color: #475569; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+.card h2 { font-size: 20px; font-weight: 600; color: #f1f5f9; }
+.card p { color: #64748b; font-size: 13px; line-height: 1.5; }
+.card-features { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 8px; }
+.feat { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.3px; background: #1e293b; color: #94a3b8; }
+
+.footer { text-align: center; padding: 20px; font-size: 11px; color: #334155; }
+
+@media (max-width: 800px) { .cards { grid-template-columns: 1fr; } .hero .stats { flex-direction: column; gap: 16px; } }
+</style>
+</head>
+<body>
+<div class="hero">
+    <h1>Trade-In <span>iPhone</span><br>Analytics</h1>
+    <p>Suite de dashboards para analizar volumen, tendencias, estacionalidad y flujos de migración del programa Trade-In.</p>
+    <div class="stats">
+        <div><div class="stat-val">11,900</div><div class="stat-lbl">Trade-Ins únicos</div></div>
+        <div><div class="stat-val">27</div><div class="stat-lbl">Modelos iPhone</div></div>
+        <div><div class="stat-val">Oct 22 – Mar 26</div><div class="stat-lbl">Período de datos</div></div>
+    </div>
+</div>
+<div class="cards">
+    <a class="card" href="dashboard.html">
+        <div class="card-num">01</div>
+        <h2>Dashboard General</h2>
+        <p>Vista ejecutiva con KPIs, volumen mensual, top modelos, rutas de migración, distribución de capacidad y grado.</p>
+        <div class="card-features">
+            <span class="feat">KPIs</span><span class="feat">Volumen</span><span class="feat">Top Modelos</span><span class="feat">Migración</span>
+        </div>
+    </a>
+    <a class="card" href="explorer.html">
+        <div class="card-num">02</div>
+        <h2>Explorador de Tendencias</h2>
+        <p>Filtra por modelo, evento y rango de fechas. Estacionalidad mensual, semanal, YoY y tendencias de valor.</p>
+        <div class="card-features">
+            <span class="feat">Filtros</span><span class="feat">Estacionalidad</span><span class="feat">YoY</span><span class="feat">Valor</span>
+        </div>
+    </a>
+    <a class="card" href="sankey.html">
+        <div class="card-num">03</div>
+        <h2>Sankey de Migración</h2>
+        <p>Flujos interactivos entre modelos entregados y comprados. Click en nodos para filtrar, hover para detalles.</p>
+        <div class="card-features">
+            <span class="feat">Interactivo</span><span class="feat">Click-to-Filter</span><span class="feat">Diferencial CLP</span>
+        </div>
+    </a>
+    <a class="card" href="insights.html">
+        <div class="card-num">04</div>
+        <h2>Insights Avanzados</h2>
+        <p>Salto generacional, migración de tier, upgrade de capacidad, retención de valor, impacto del grado y fuga a otros productos.</p>
+        <div class="card-features">
+            <span class="feat">Generacional</span><span class="feat">Tier</span><span class="feat">Capacidad</span><span class="feat">Retención</span>
+        </div>
+    </a>
+    <a class="card" href="curves.html">
+        <div class="card-num">05</div>
+        <h2>Curvas de Valor</h2>
+        <p>Evolución del valor de trade-in por modelo y grado. Correlación con volumen del programa y análisis de spread A-B.</p>
+        <div class="card-features">
+            <span class="feat">Depreciación</span><span class="feat">Grado A vs B</span><span class="feat">Correlación</span>
+        </div>
+    </a>
+    <a class="card" href="benchmark.html">
+        <div class="card-num">06</div>
+        <h2>Benchmark Competitivo</h2>
+        <p>Comparación de precios trade-in: Apple, Entel, Aufbau/Reuse vs MacOnline. Por modelo y capacidad.</p>
+        <div class="card-features">
+            <span class="feat">4 Fuentes</span><span class="feat">Por GB</span><span class="feat">Posicionamiento</span>
+        </div>
+    </a>
+    <a class="card" href="elasticity.html">
+        <div class="card-num">07</div>
+        <h2>Elasticidad de Precio</h2>
+        <p>¿Cuánto responde el volumen de trade-ins cuando cambia el precio de recompra? Análisis por modelo con significancia estadística.</p>
+        <div class="card-features">
+            <span class="feat">Elasticidad</span><span class="feat">p-valor</span><span class="feat">Regresión</span>
+        </div>
+    </a>
+</div>
+<div class="footer">Trade-In iPhone Analytics · MacOnline</div>
+</body>
+</html>
