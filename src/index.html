@@ -37,6 +37,9 @@ body { font-family: 'DM Sans', -apple-system, sans-serif; background: #0c111b; c
 .card p { color: #64748b; font-size: 13px; line-height: 1.5; }
 .card-features { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 8px; }
 .feat { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.3px; background: #1e293b; color: #94a3b8; }
+.card-thumb { width:100%; height:120px; border-radius:10px; margin-bottom:12px; overflow:hidden; background:#0c111b; display:flex; align-items:center; justify-content:center; position:relative; }
+.card-thumb svg { width:100%; height:100%; }
+.card-thumb::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(139,92,246,0.08) 100%); pointer-events:none; }
 
 .footer { text-align: center; padding: 20px; font-size: 11px; color: #334155; }
 
@@ -55,6 +58,7 @@ body { font-family: 'DM Sans', -apple-system, sans-serif; background: #0c111b; c
 </div>
 <div class="cards">
     <a class="card" href="dashboard.html">
+        <div class="card-thumb"><svg viewBox="0 0 200 100"><rect x="10" y="8" width="55" height="22" rx="3" fill="#1e293b" stroke="#334155" stroke-width="0.5"/><text x="16" y="22" font-size="7" fill="#3b82f6" font-weight="600">11,900</text><rect x="72" y="8" width="55" height="22" rx="3" fill="#1e293b" stroke="#334155" stroke-width="0.5"/><text x="78" y="22" font-size="7" fill="#10b981" font-weight="600">$1.3M</text><rect x="20" y="92" width="12" height="0" fill="#3b82f6" rx="1"><animate attributeName="height" from="0" to="30" dur="0.6s" fill="freeze"/><animate attributeName="y" from="92" to="62" dur="0.6s" fill="freeze"/></rect><rect x="38" y="92" width="12" height="0" fill="#10b981" rx="1"><animate attributeName="height" from="0" to="45" dur="0.6s" fill="freeze" begin="0.1s"/><animate attributeName="y" from="92" to="47" dur="0.6s" fill="freeze" begin="0.1s"/></rect><rect x="56" y="92" width="12" height="0" fill="#3b82f6" rx="1"><animate attributeName="height" from="0" to="55" dur="0.6s" fill="freeze" begin="0.2s"/><animate attributeName="y" from="92" to="37" dur="0.6s" fill="freeze" begin="0.2s"/></rect><rect x="74" y="92" width="12" height="0" fill="#10b981" rx="1"><animate attributeName="height" from="0" to="40" dur="0.6s" fill="freeze" begin="0.3s"/><animate attributeName="y" from="92" to="52" dur="0.6s" fill="freeze" begin="0.3s"/></rect><rect x="92" y="92" width="12" height="0" fill="#3b82f6" rx="1"><animate attributeName="height" from="0" to="65" dur="0.6s" fill="freeze" begin="0.4s"/><animate attributeName="y" from="92" to="27" dur="0.6s" fill="freeze" begin="0.4s"/></rect><rect x="110" y="92" width="12" height="0" fill="#10b981" rx="1"><animate attributeName="height" from="0" to="50" dur="0.6s" fill="freeze" begin="0.5s"/><animate attributeName="y" from="92" to="42" dur="0.6s" fill="freeze" begin="0.5s"/></rect><rect x="128" y="92" width="12" height="0" fill="#ef4444" rx="1"><animate attributeName="height" from="0" to="35" dur="0.6s" fill="freeze" begin="0.6s"/><animate attributeName="y" from="92" to="57" dur="0.6s" fill="freeze" begin="0.6s"/></rect><rect x="146" y="92" width="12" height="0" fill="#3b82f6" rx="1"><animate attributeName="height" from="0" to="48" dur="0.6s" fill="freeze" begin="0.7s"/><animate attributeName="y" from="92" to="44" dur="0.6s" fill="freeze" begin="0.7s"/></rect></svg></div>
         <div class="card-num">01</div>
         <h2>Dashboard General</h2>
         <p>Vista ejecutiva con KPIs, volumen mensual, top modelos, rutas de migración, distribución de capacidad y grado.</p>
@@ -63,6 +67,7 @@ body { font-family: 'DM Sans', -apple-system, sans-serif; background: #0c111b; c
         </div>
     </a>
     <a class="card" href="explorer.html">
+        <div class="card-thumb"><svg viewBox="0 0 200 100"><polyline points="10,70 30,65 50,50 70,55 90,35 110,40 130,25 150,30 170,15 190,20" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.8"/><polyline points="10,80 30,75 50,65 70,60 90,55 110,45 130,50 150,35 170,40 190,30" fill="none" stroke="#10b981" stroke-width="2" opacity="0.8"/><polyline points="10,85 30,82 50,78 70,80 90,72 110,68 130,65 150,60 170,58 190,55" fill="none" stroke="#f59e0b" stroke-width="2" opacity="0.6"/><circle cx="170" cy="15" r="3" fill="#3b82f6"/><circle cx="190" cy="30" r="3" fill="#10b981"/></svg></div>
         <div class="card-num">02</div>
         <h2>Explorador de Tendencias</h2>
         <p>Filtra por modelo, evento y rango de fechas. Estacionalidad mensual, semanal, YoY y tendencias de valor.</p>
@@ -71,6 +76,7 @@ body { font-family: 'DM Sans', -apple-system, sans-serif; background: #0c111b; c
         </div>
     </a>
     <a class="card" href="sankey.html">
+        <div class="card-thumb"><svg viewBox="0 0 200 100"><path d="M10,15 C80,15 120,35 190,35" fill="none" stroke="#3b82f6" stroke-width="8" opacity="0.6"/><path d="M10,35 C80,35 120,55 190,55" fill="none" stroke="#8b5cf6" stroke-width="6" opacity="0.5"/><path d="M10,55 C80,55 120,25 190,75" fill="none" stroke="#06b6d4" stroke-width="5" opacity="0.5"/><path d="M10,75 C80,75 120,65 190,15" fill="none" stroke="#ec4899" stroke-width="4" opacity="0.4"/><rect x="5" y="10" width="4" height="75" rx="2" fill="#3b82f6" opacity="0.6"/><rect x="191" y="10" width="4" height="75" rx="2" fill="#8b5cf6" opacity="0.6"/></svg></div>
         <div class="card-num">03</div>
         <h2>Sankey de Migración</h2>
         <p>Flujos interactivos entre modelos entregados y comprados. Click en nodos para filtrar, hover para detalles.</p>
@@ -79,6 +85,7 @@ body { font-family: 'DM Sans', -apple-system, sans-serif; background: #0c111b; c
         </div>
     </a>
     <a class="card" href="migration.html">
+        <div class="card-thumb"><svg viewBox="0 0 200 100"><defs><linearGradient id="hg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#1e293b"/><stop offset="50%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient></defs><rect x="10" y="10" width="14" height="14" rx="2" fill="#3b82f6" opacity="0.8"/><rect x="28" y="10" width="14" height="14" rx="2" fill="#1e293b"/><rect x="46" y="10" width="14" height="14" rx="2" fill="#8b5cf6" opacity="0.4"/><rect x="64" y="10" width="14" height="14" rx="2" fill="#3b82f6" opacity="0.3"/><rect x="82" y="10" width="14" height="14" rx="2" fill="#8b5cf6" opacity="0.7"/><rect x="10" y="28" width="14" height="14" rx="2" fill="#1e293b"/><rect x="28" y="28" width="14" height="14" rx="2" fill="#3b82f6" opacity="0.9"/><rect x="46" y="28" width="14" height="14" rx="2" fill="#8b5cf6" opacity="0.6"/><rect x="64" y="28" width="14" height="14" rx="2" fill="#3b82f6" opacity="0.2"/><rect x="82" y="28" width="14" height="14" rx="2" fill="#1e293b"/><rect x="10" y="46" width="14" height="14" rx="2" fill="#8b5cf6" opacity="0.5"/><rect x="28" y="46" width="14" height="14" rx="2" fill="#3b82f6" opacity="0.4"/><rect x="46" y="46" width="14" height="14" rx="2" fill="#8b5cf6" opacity="0.9"/><rect x="64" y="46" width="14" height="14" rx="2" fill="#3b82f6" opacity="0.6"/><rect x="82" y="46" width="14" height="14" rx="2" fill="#8b5cf6" opacity="0.3"/><rect x="10" y="64" width="14" height="14" rx="2" fill="#3b82f6" opacity="0.6"/><rect x="28" y="64" width="14" height="14" rx="2" fill="#8b5cf6" opacity="0.3"/><rect x="46" y="64" width="14" height="14" rx="2" fill="#3b82f6" opacity="0.7"/><rect x="64" y="64" width="14" height="14" rx="2" fill="#8b5cf6" opacity="0.8"/><rect x="82" y="64" width="14" height="14" rx="2" fill="#3b82f6" opacity="0.5"/><rect x="10" y="82" width="14" height="14" rx="2" fill="#1e293b"/><rect x="28" y="82" width="14" height="14" rx="2" fill="#8b5cf6" opacity="0.5"/><rect x="46" y="82" width="14" height="14" rx="2" fill="#3b82f6" opacity="0.3"/><rect x="64" y="82" width="14" height="14" rx="2" fill="#8b5cf6" opacity="0.4"/><rect x="82" y="82" width="14" height="14" rx="2" fill="#3b82f6" opacity="0.9"/></svg></div>
         <div class="card-num">04</div>
         <h2>Matriz de Migración</h2>
         <p>Heatmap completo modelo-a-modelo: de qué iPhone vienen y a qué iPhone compran, con % por fila e insights de rutas.</p>
@@ -87,6 +94,7 @@ body { font-family: 'DM Sans', -apple-system, sans-serif; background: #0c111b; c
         </div>
     </a>
     <a class="card" href="insights.html">
+        <div class="card-thumb"><svg viewBox="0 0 200 100"><circle cx="50" cy="50" r="30" fill="none" stroke="#1e293b" stroke-width="8"/><circle cx="50" cy="50" r="30" fill="none" stroke="#10b981" stroke-width="8" stroke-dasharray="120 189" transform="rotate(-90 50 50)"/><circle cx="50" cy="50" r="30" fill="none" stroke="#3b82f6" stroke-width="8" stroke-dasharray="50 189" stroke-dashoffset="-120" transform="rotate(-90 50 50)"/><text x="50" y="53" text-anchor="middle" font-size="9" fill="#f1f5f9" font-weight="600">89%</text><rect x="110" y="25" width="70" height="10" rx="2" fill="#1e293b"/><rect x="110" y="25" width="50" height="10" rx="2" fill="#10b981" opacity="0.7"/><rect x="110" y="42" width="70" height="10" rx="2" fill="#1e293b"/><rect x="110" y="42" width="35" height="10" rx="2" fill="#3b82f6" opacity="0.7"/><rect x="110" y="59" width="70" height="10" rx="2" fill="#1e293b"/><rect x="110" y="59" width="55" height="10" rx="2" fill="#8b5cf6" opacity="0.7"/><rect x="110" y="76" width="70" height="10" rx="2" fill="#1e293b"/><rect x="110" y="76" width="25" height="10" rx="2" fill="#f59e0b" opacity="0.7"/></svg></div>
         <div class="card-num">05</div>
         <h2>Insights Avanzados</h2>
         <p>Salto generacional, migración de tier, upgrade de capacidad, retención de valor, impacto del grado y fuga a otros productos.</p>
@@ -95,6 +103,7 @@ body { font-family: 'DM Sans', -apple-system, sans-serif; background: #0c111b; c
         </div>
     </a>
     <a class="card" href="curves.html">
+        <div class="card-thumb"><svg viewBox="0 0 200 100"><polyline points="10,20 30,22 50,25 70,30 90,38 110,50 130,60 150,68 170,72 190,78" fill="none" stroke="#10b981" stroke-width="2.5"/><polyline points="10,30 30,33 50,38 70,45 90,55 110,62 130,70 150,76 170,80 190,85" fill="none" stroke="#ef4444" stroke-width="2.5"/><text x="12" y="16" font-size="7" fill="#64748b">$380K</text><text x="170" y="95" font-size="7" fill="#64748b">$150K</text><line x1="10" y1="95" x2="190" y2="95" stroke="#334155" stroke-width="0.5"/></svg></div>
         <div class="card-num">06</div>
         <h2>Curvas de Valor</h2>
         <p>Evolución del valor de trade-in por modelo y grado. Correlación con volumen del programa y análisis de spread A-B.</p>
@@ -103,6 +112,7 @@ body { font-family: 'DM Sans', -apple-system, sans-serif; background: #0c111b; c
         </div>
     </a>
     <a class="card" href="benchmark.html">
+        <div class="card-thumb"><svg viewBox="0 0 200 100"><rect x="15" y="55" width="10" height="35" rx="2" fill="#3b82f6"/><rect x="28" y="45" width="10" height="45" rx="2" fill="#10b981"/><rect x="41" y="60" width="10" height="30" rx="2" fill="#f59e0b"/><rect x="54" y="50" width="10" height="40" rx="2" fill="#ef4444"/><rect x="80" y="40" width="10" height="50" rx="2" fill="#3b82f6"/><rect x="93" y="50" width="10" height="40" rx="2" fill="#10b981"/><rect x="106" y="35" width="10" height="55" rx="2" fill="#f59e0b"/><rect x="119" y="55" width="10" height="35" rx="2" fill="#ef4444"/><rect x="145" y="30" width="10" height="60" rx="2" fill="#3b82f6"/><rect x="158" y="45" width="10" height="45" rx="2" fill="#10b981"/><rect x="171" y="50" width="10" height="40" rx="2" fill="#f59e0b"/><rect x="184" y="40" width="10" height="50" rx="2" fill="#ef4444"/><line x1="10" y1="92" x2="195" y2="92" stroke="#334155" stroke-width="0.5"/></svg></div>
         <div class="card-num">07</div>
         <h2>Benchmark Competitivo</h2>
         <p>Comparación de precios trade-in: Apple, Entel, Aufbau/Reuse vs MacOnline. Por modelo y capacidad.</p>
@@ -111,6 +121,7 @@ body { font-family: 'DM Sans', -apple-system, sans-serif; background: #0c111b; c
         </div>
     </a>
     <a class="card" href="elasticity.html">
+        <div class="card-thumb"><svg viewBox="0 0 200 100"><line x1="15" y1="20" x2="185" y2="75" stroke="#3b82f6" stroke-width="1.5" opacity="0.5" stroke-dasharray="4"/><circle cx="25" cy="30" r="3" fill="#3b82f6" opacity="0.7"/><circle cx="45" cy="35" r="4" fill="#3b82f6" opacity="0.7"/><circle cx="60" cy="28" r="3" fill="#3b82f6" opacity="0.7"/><circle cx="80" cy="45" r="5" fill="#10b981" opacity="0.7"/><circle cx="95" cy="50" r="3" fill="#3b82f6" opacity="0.7"/><circle cx="110" cy="42" r="4" fill="#10b981" opacity="0.7"/><circle cx="130" cy="58" r="3" fill="#f59e0b" opacity="0.7"/><circle cx="145" cy="62" r="5" fill="#ef4444" opacity="0.7"/><circle cx="165" cy="70" r="3" fill="#ef4444" opacity="0.7"/><circle cx="180" cy="75" r="4" fill="#ef4444" opacity="0.7"/><text x="160" y="18" font-size="8" fill="#64748b">p&lt;0.05</text></svg></div>
         <div class="card-num">08</div>
         <h2>Elasticidad de Precio</h2>
         <p>¿Cuánto responde el volumen de trade-ins cuando cambia el precio de recompra? Análisis por modelo con significancia estadística.</p>

@@ -45,6 +45,22 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 @keyframes drawPath { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
 #sankey-svg { animation: fadeIn 0.6s ease-out; }
 .lk { stroke-dasharray: 1000; animation: drawPath 1.2s ease-out forwards; }
+.sankey-layout { display:grid; grid-template-columns:1fr 280px; gap:16px; }
+.insights-panel { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; height:fit-content; position:sticky; top:16px; }
+.insights-panel h3 { font-size:14px; font-weight:600; color:var(--t1); margin-bottom:14px; }
+.insights-legend { margin-bottom:20px; }
+.insights-legend .legend-label { font-size:11px; color:var(--t3); margin-bottom:6px; }
+.insights-gradient { height:8px; border-radius:4px; background:linear-gradient(90deg, #1e293b, #3b82f6, #8b5cf6, #c084fc); margin-bottom:4px; }
+.insights-legend .legend-range { display:flex; justify-content:space-between; font-size:10px; color:var(--t3); }
+.route-list { list-style:none; padding:0; margin:0; }
+.route-item { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid rgba(30,41,59,0.5); }
+.route-item:last-child { border-bottom:none; }
+.route-rank { width:20px; height:20px; border-radius:50%; background:rgba(59,130,246,0.15); color:#60a5fa; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.route-info { flex:1; min-width:0; }
+.route-name { font-size:12px; color:var(--t1); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.route-count { font-size:10px; color:var(--t3); }
+.route-bar { height:4px; border-radius:2px; margin-top:3px; background:linear-gradient(90deg, #3b82f6, #8b5cf6); }
+@media(max-width:900px) { .sankey-layout { grid-template-columns:1fr; } }
 </style>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
@@ -73,10 +89,22 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
     <div class="kp"><div class="l">Diferencial Prom.</div><div class="v" id="k4" style="color:var(--green)">—</div><div class="s">CLP adicional promedio</div></div>
 </div>
 <div class="wrap">
-    <div class="crd">
-        <h3>Flujo Entrega → Compra</h3>
-        <div class="sub">El grosor de cada flujo es proporcional a la cantidad de trade-ins. Pase el mouse para detalles. Click en un nodo para filtrar.</div>
-        <div id="chart"></div>
+    <div class="sankey-layout">
+        <div class="crd">
+            <h3>Flujo Entrega → Compra</h3>
+            <div class="sub">El grosor de cada flujo es proporcional a la cantidad de trade-ins. Pase el mouse para detalles. Click en un nodo para filtrar.</div>
+            <div id="chart"></div>
+        </div>
+        <div class="insights-panel" id="insightsPanel">
+            <h3>Migration Insights</h3>
+            <div class="insights-legend">
+                <div class="legend-label">Intensidad del flujo</div>
+                <div class="insights-gradient"></div>
+                <div class="legend-range"><span>Bajo</span><span>Alto</span></div>
+            </div>
+            <h4 style="font-size:12px;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Top 5 Rutas</h4>
+            <ul class="route-list" id="topRoutesList"></ul>
+        </div>
     </div>
 </div>
 <div class="wrap">
@@ -379,6 +407,20 @@ function render(){
         document.getElementById('k3s').textContent='';
         document.getElementById('k4').textContent='—';
     }
+
+    // Populate insights panel
+    const top5 = flows.slice(0, 5);
+    const maxCount = top5.length ? top5[0].count : 1;
+    const routeHtml = top5.map((f, i) =>
+        '<li class="route-item">' +
+        '<span class="route-rank">' + (i+1) + '</span>' +
+        '<div class="route-info">' +
+        '<div class="route-name">' + f.from + ' → ' + f.to + '</div>' +
+        '<div class="route-count">' + fmt(f.count) + ' trade-ins</div>' +
+        '<div class="route-bar" style="width:' + (f.count/maxCount*100) + '%"></div>' +
+        '</div></li>'
+    ).join('');
+    document.getElementById('topRoutesList').innerHTML = routeHtml;
 
     const box=document.getElementById('chart');
     if(flows.length===0){ box.innerHTML='<div class="empty">Sin datos para los filtros seleccionados.</div>'; return; }
