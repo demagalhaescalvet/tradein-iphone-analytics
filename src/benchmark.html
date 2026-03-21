@@ -66,17 +66,6 @@ svg { font-family:'DM Sans',-apple-system,sans-serif; }
 </style>
 </head>
 <body>
-<nav>
-<a href="index.html" class="back"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Hub</a>
-<a href="dashboard.html">Dashboard</a>
-<a href="explorer.html">Explorer</a>
-<a href="sankey.html">Sankey</a>
-<a href="migration.html">Migración</a>
-<a href="insights.html">Insights</a>
-<a href="curves.html">Curvas</a>
-<a href="benchmark.html" class="active">Benchmark</a>
-<a href="elasticity.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
-</nav>
 
 <div class="hdr">
     <h1>Benchmark Competitivo de Precios Trade-In</h1>
@@ -381,5 +370,7 @@ function initBenchmark() {
   render();
 }
 </script>
+<script src="js/sidebar.js"></script>
+<script>initSidebar('benchmark');</script>
 </body>
 </html>

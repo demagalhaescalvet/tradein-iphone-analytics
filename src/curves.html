@@ -57,16 +57,6 @@ nav .back { padding:0 14px 0 0; border-right:1px solid var(--border); margin-rig
 </head>
 <body>
 <script src="js/daterange-picker.js"></script>
-<nav>
-<a href="index.html" class="back"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Hub</a>
-<a href="dashboard.html">Dashboard</a>
-<a href="explorer.html">Explorer</a>
-<a href="sankey.html">Sankey</a>
-<a href="insights.html">Insights</a>
-<a href="curves.html" class="active">Curvas</a>
-<a href="benchmark.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Benchmark</a>
-<a href="elasticity.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
-</nav>
 
 <div class="hdr">
     <h1>Curvas de Valor de Trade-In</h1>
@@ -775,5 +765,7 @@ function initCurves() {
 }
 
 </script>
+<script src="js/sidebar.js"></script>
+<script>initSidebar('curves');</script>
 </body>
 </html>

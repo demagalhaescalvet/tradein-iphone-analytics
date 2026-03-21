@@ -142,15 +142,6 @@
 </head>
 <body>
 
-<nav>
-  <span class="back" onclick="window.history.back()">←</span>
-  <a href="dashboard.html" style="color:#94a3b8;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Dashboard</a>
-  <a href="sankey.html" style="color:#94a3b8;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Sankey</a>
-  <a href="migration.html" style="color:#94a3b8;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Migración</a>
-  <a href="insights.html" style="color:#94a3b8;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Insights</a>
-  <a href="benchmark.html" style="color:#94a3b8;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Benchmark</a>
-  <a class="active" href="elasticity.html" style="color:#94a3b8;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
-</nav>
 
 <div class="hdr">
   <div>
@@ -613,6 +604,8 @@ function createGridLines(yScale, width, height) {
 // Inline payload data
 // Data embedded in RAW above
 </script>
+<script src="js/sidebar.js"></script>
+<script>initSidebar('elasticity');</script>
 
 </body>
 </html>

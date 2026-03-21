@@ -51,17 +51,6 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 </head>
 <body>
 <script src="js/daterange-picker.js"></script>
-<nav style="background:#0c111b;padding:0 28px;display:flex;align-items:center;border-bottom:1px solid #1e293b;font-family:'DM Sans',-apple-system,sans-serif;font-size:13px;height:44px;gap:0;">
-<a href="index.html" style="color:#475569;text-decoration:none;font-weight:600;padding:0 14px 0 0;border-right:1px solid #1e293b;margin-right:4px;display:flex;align-items:center;gap:4px;height:100%;">
-<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Hub</a>
-<a href="dashboard.html" class="nav-link" id="nav-dashboard" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Dashboard</a>
-<a href="explorer.html" class="nav-link" id="nav-explorer" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Explorer</a>
-<a href="sankey.html" class="nav-link" id="nav-sankey" style="color:#f1f5f9;text-decoration:none;padding:10px 14px;border-bottom:2px solid #3b82f6;font-weight:600;display:flex;align-items:center;gap:5px;height:100%;">Sankey</a>
-<a href="insights.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Insights</a>
-<a href="curves.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Curvas</a>
-<a href="benchmark.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Benchmark</a>
-<a href="elasticity.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
-</nav>
 
 <div class="hdr">
     <h1>Trade-In iPhone — Flujo de Migración (Sankey)</h1>
@@ -522,5 +511,7 @@ document.addEventListener('mouseleave',function(e){
 // Initialization moved to fetch handler above
 window.addEventListener('resize', function(){ if(RAW) render(); });
 </script>
+<script src="js/sidebar.js"></script>
+<script>initSidebar('sankey');</script>
 </body>
 </html>

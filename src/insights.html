@@ -57,13 +57,6 @@ svg { display:block; margin:0 auto; }
 <body>
 <script src="js/daterange-picker.js"></script>
 
-<nav>
-<span class="back">←</span>
-<a href='/' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Dashboard</a>
-<a class='active' href='/insights' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Insights</a>
-<a href='/benchmark' style='color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;'>Benchmark</a>
-<a href="elasticity.html" style="color:#475569;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
-</nav>
 
 <div class="hdr"><div><h1>Insights Avanzados</h1><p id="statusLabel">Análisis profundo del programa Trade-In</p></div></div>
 <div class="filters">
@@ -898,5 +891,7 @@ function initInsights() {
     render();
 }
 </script>
+<script src="js/sidebar.js"></script>
+<script>initSidebar('insights');</script>
 </body>
 </html>
