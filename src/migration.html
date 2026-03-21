@@ -67,6 +67,15 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 .legend { display:flex; align-items:center; gap:16px; padding:8px 0; flex-wrap:wrap; }
 .legend-gradient { width:200px; height:14px; border-radius:3px; border:1px solid var(--border); }
 .legend span { font-size:10px; color:var(--t3); }
+
+/* Control bar */
+.ctrl-bar { display:flex; gap:14px; align-items:end; flex-wrap:wrap; padding:14px 28px; background:var(--card); border-bottom:1px solid var(--border); }
+.fg { display:flex; flex-direction:column; gap:3px; }
+.fg label { font-size:10px; color:var(--t2); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+.fg input { padding:7px 10px; border:1px solid var(--border); border-radius:7px; background:var(--bg); color:var(--t1); font-size:13px; min-width:140px; }
+.fg input:focus { outline:none; border-color:var(--accent); }
+.btn { padding:7px 14px; border-radius:7px; border:1px solid var(--border); background:transparent; color:var(--t2); cursor:pointer; font-size:12px; font-weight:600; }
+.btn:hover { border-color:var(--accent); color:var(--accent); }
 </style>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
@@ -88,6 +97,11 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 <div class="hdr">
     <h1>Trade-In iPhone — Matriz de Migración por Modelo</h1>
     <p id="subtitle">Flujo completo: de qué iPhone vienen → a qué iPhone compran (en % por fila)</p>
+</div>
+<div class="ctrl-bar">
+    <div class="fg"><label>Desde</label><input type="date" id="fDS" onchange="render()"></div>
+    <div class="fg"><label>Hasta</label><input type="date" id="fDE" onchange="render()"></div>
+    <div class="fg" style="justify-content:end"><button class="btn" onclick="resetF()">Reset</button></div>
 </div>
 
 <div class="kpis">
@@ -131,63 +145,167 @@ const fmtC = n => n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+Math.round(n/1e3)
 
 fetch('data/processed/migration.json')
     .then(r => r.json())
-    .then(d => { RAW = d; init(); })
+    .then(d => { RAW = d; initMigration(); })
     .catch(e => console.error('Data load error:', e));
 
-function init() {
+function initMigration() {
     if (!RAW) return;
-    renderKPIs();
-    renderMatrix();
-    renderTopRoutes();
-    renderGenChart();
+    document.getElementById('fDS').value = RAW.dateMin;
+    document.getElementById('fDE').value = RAW.dateMax;
+    render();
 }
 
-function renderKPIs() {
-    document.getElementById('k1').textContent = fmt(RAW.totalPairs);
+function resetF() {
+    if (!RAW) return;
+    document.getElementById('fDS').value = RAW.dateMin;
+    document.getElementById('fDE').value = RAW.dateMax;
+    render();
+}
 
-    // Count active routes
-    let routes = 0;
-    RAW.matrix.forEach(row => { routes += Object.keys(row.destinations).length; });
-    document.getElementById('k2').textContent = fmt(routes);
+function genNum(name) {
+    const m = name.match(/(\d+)/);
+    return m ? parseInt(m[1]) : 0;
+}
 
-    // Top route
-    const top = RAW.topRoutes[0];
-    document.getElementById('k3').textContent = top.from + ' → ' + top.to;
-    document.getElementById('k3s').textContent = fmt(top.count) + ' trade-ins (' + top.pct + '%)';
+function getFiltered() {
+    const ds = document.getElementById('fDS').value.substring(0, 7);
+    const de = document.getElementById('fDE').value.substring(0, 7);
+    return RAW.flows.filter(f => {
+        if (ds && f.ym < ds) return false;
+        if (de && f.ym > de) return false;
+        return true;
+    });
+}
 
-    // Avg gen jump
+function aggregate(flows) {
+    // Aggregate flows into matrix + routes + gen jumps
+    const byRoute = {};
+    flows.forEach(f => {
+        const k = f.from_model + '|' + f.to_model;
+        if (!byRoute[k]) byRoute[k] = { from: f.from_model, to: f.to_model, count: 0, retSum: 0, purSum: 0 };
+        byRoute[k].count += f.count;
+        byRoute[k].retSum += f.avg_ret * f.count;
+        byRoute[k].purSum += f.avg_pur * f.count;
+    });
+
+    const routes = Object.values(byRoute).map(r => ({
+        ...r,
+        avg_ret: Math.round(r.retSum / r.count),
+        avg_pur: Math.round(r.purSum / r.count),
+        avg_delta: Math.round((r.purSum - r.retSum) / r.count),
+    })).sort((a, b) => b.count - a.count);
+
+    const totalPairs = routes.reduce((s, r) => s + r.count, 0);
+
+    // Build matrix rows
+    const fromTotals = {};
+    const fromRetSum = {};
+    routes.forEach(r => {
+        fromTotals[r.from] = (fromTotals[r.from] || 0) + r.count;
+        fromRetSum[r.from] = (fromRetSum[r.from] || 0) + r.retSum;
+    });
+
+    // Only include models that appear in filtered data
+    const activeFrom = RAW.fromModels.filter(m => fromTotals[m] > 0);
+    const colTotals = {};
+    routes.forEach(r => { colTotals[r.to] = (colTotals[r.to] || 0) + r.count; });
+    const activeTo = RAW.toModels.filter(m => colTotals[m] > 0);
+
+    const matrix = activeFrom.map(fm => {
+        const total = fromTotals[fm];
+        const avgRet = Math.round(fromRetSum[fm] / total);
+        const destinations = {};
+        routes.filter(r => r.from === fm).forEach(r => {
+            destinations[r.to] = {
+                count: r.count,
+                pct: Math.round(r.count / total * 1000) / 10,
+                avg_pur: r.avg_pur,
+            };
+        });
+        return { model: fm, total, avg_ret_val: avgRet, destinations };
+    });
+
+    // Gen jumps
+    const genJumpMap = {};
+    routes.forEach(r => {
+        const jump = genNum(r.to) - genNum(r.from);
+        genJumpMap[jump] = (genJumpMap[jump] || 0) + r.count;
+    });
+    const genJumps = Object.entries(genJumpMap).map(([j, c]) => ({
+        jump: parseInt(j), count: c, pct: Math.round(c / totalPairs * 1000) / 10
+    })).sort((a, b) => a.jump - b.jump);
+
+    return { matrix, routes, totalPairs, genJumps, activeFrom, activeTo, colTotals };
+}
+
+function render() {
+    if (!RAW) return;
+    const flows = getFiltered();
+    const data = aggregate(flows);
+
+    renderKPIs(data);
+    renderMatrix(data);
+    renderTopRoutes(data);
+    renderGenChart(data);
+
+    // Update subtitle with date range
+    const ds = document.getElementById('fDS').value;
+    const de = document.getElementById('fDE').value;
+    document.getElementById('subtitle').textContent =
+        `Flujo completo: de qué iPhone vienen → a qué iPhone compran (en % por fila) · ${ds} a ${de}`;
+}
+
+function renderKPIs(data) {
+    document.getElementById('k1').textContent = fmt(data.totalPairs);
+
+    let routeCount = 0;
+    data.matrix.forEach(row => { routeCount += Object.keys(row.destinations).length; });
+    document.getElementById('k2').textContent = fmt(routeCount);
+
+    if (data.routes.length > 0) {
+        const top = data.routes[0];
+        document.getElementById('k3').textContent = top.from + ' → ' + top.to;
+        const topPct = (top.count / data.totalPairs * 100).toFixed(1);
+        document.getElementById('k3s').textContent = fmt(top.count) + ' trade-ins (' + topPct + '%)';
+    } else {
+        document.getElementById('k3').textContent = '—';
+        document.getElementById('k3s').textContent = '';
+    }
+
     let totalJumps = 0, totalCount = 0;
-    RAW.genJumps.forEach(g => { totalJumps += g.jump * g.count; totalCount += g.count; });
-    const avgJump = (totalJumps / totalCount).toFixed(1);
+    data.genJumps.forEach(g => { totalJumps += g.jump * g.count; totalCount += g.count; });
+    const avgJump = totalCount ? (totalJumps / totalCount).toFixed(1) : '0';
     document.getElementById('k4').textContent = '+' + avgJump;
 
-    // Top 5 concentration
-    const top5count = RAW.topRoutes.slice(0, 5).reduce((s, r) => s + r.count, 0);
-    document.getElementById('k5').textContent = ((top5count / RAW.totalPairs) * 100).toFixed(1) + '%';
+    const top5count = data.routes.slice(0, 5).reduce((s, r) => s + r.count, 0);
+    document.getElementById('k5').textContent = data.totalPairs ? ((top5count / data.totalPairs) * 100).toFixed(1) + '%' : '—';
 }
 
-function renderMatrix() {
+function renderMatrix(data) {
     const container = document.getElementById('matrixContainer');
-    const fromModels = RAW.fromModels;
-    const toModels = RAW.toModels;
+    const fromModels = data.activeFrom;
+    const toModels = data.activeTo;
 
-    // Color scale: 0% → dark bg, high% → bright purple
-    const maxPct = Math.max(...RAW.matrix.flatMap(r => Object.values(r.destinations).map(d => d.pct)));
+    if (fromModels.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:60px;color:#64748b;">Sin datos para el rango seleccionado</div>';
+        document.getElementById('legend').innerHTML = '';
+        return;
+    }
+
+    const maxPct = Math.max(...data.matrix.flatMap(r => Object.values(r.destinations).map(d => d.pct)), 1);
     const colorScale = d3.scaleSequential(d3.interpolateRgbBasis([
         '#1e293b', '#312e81', '#4c1d95', '#7c3aed', '#a78bfa', '#c4b5fd'
     ])).domain([0, Math.min(maxPct, 30)]);
 
-    // Build table
     let html = '<table class="matrix-table"><thead><tr>';
     html += '<th class="corner row-header" style="text-align:center;vertical-align:bottom;font-size:11px;color:var(--red);">FROM ↓ &nbsp;/&nbsp; TO →</th>';
     toModels.forEach(m => {
-        const short = m.replace('iPhone ', '');
-        html += `<th class="col-header">${short}</th>`;
+        html += `<th class="col-header">${m.replace('iPhone ', '')}</th>`;
     });
     html += '<th class="col-header" style="color:var(--amber);font-weight:700;">Total</th>';
     html += '</tr></thead><tbody>';
 
-    RAW.matrix.forEach(row => {
+    data.matrix.forEach(row => {
         const short = row.model.replace('iPhone ', '');
         html += `<tr><th class="row-header">${short} <span style="color:var(--t3);font-weight:400;font-size:9px;">(${fmt(row.total)})</span></th>`;
         toModels.forEach(tm => {
@@ -209,21 +327,16 @@ function renderMatrix() {
         html += '</tr>';
     });
 
-    // Column totals row
     html += '<tr class="col-total-row"><th class="row-header" style="color:var(--amber);font-weight:700;font-size:10px;">TOTAL</th>';
     toModels.forEach(tm => {
-        let colTotal = 0;
-        RAW.matrix.forEach(row => {
-            if (row.destinations[tm]) colTotal += row.destinations[tm].count;
-        });
-        html += `<td style="text-align:center;font-size:9px;font-weight:600;color:var(--amber);background:rgba(245,158,11,0.06);padding:4px 2px;">${colTotal > 0 ? fmt(colTotal) : ''}</td>`;
+        const ct = data.colTotals[tm] || 0;
+        html += `<td style="text-align:center;font-size:9px;font-weight:600;color:var(--amber);background:rgba(245,158,11,0.06);padding:4px 2px;">${ct > 0 ? fmt(ct) : ''}</td>`;
     });
-    html += `<td class="row-total" style="color:var(--accent);font-weight:800;">${fmt(RAW.totalPairs)}</td>`;
+    html += `<td class="row-total" style="color:var(--accent);font-weight:800;">${fmt(data.totalPairs)}</td>`;
     html += '</tr></tbody></table>';
-
     container.innerHTML = html;
 
-    // Build legend
+    // Legend
     const legendDiv = document.getElementById('legend');
     const canvas = document.createElement('canvas');
     canvas.width = 200; canvas.height = 14;
@@ -239,9 +352,11 @@ function renderMatrix() {
     legendDiv.innerHTML += `<span>${Math.min(maxPct, 30).toFixed(0)}%+</span><span style="margin-left:16px;color:var(--t2);">= % de trade-ins del modelo FROM que fueron a cada modelo TO</span>`;
 }
 
-function renderTopRoutes() {
+function renderTopRoutes(data) {
     const div = document.getElementById('topRoutes');
-    const maxCount = RAW.topRoutes[0].count;
+    const top15 = data.routes.slice(0, 15);
+    if (top15.length === 0) { div.innerHTML = '<div style="text-align:center;padding:40px;color:#64748b;">Sin datos</div>'; return; }
+    const maxCount = top15[0].count;
 
     let html = '<table class="routes-table"><thead><tr>';
     html += '<th>Ruta</th><th style="text-align:right">Trade-Ins</th><th style="text-align:right">%</th>';
@@ -249,25 +364,27 @@ function renderTopRoutes() {
     html += '<th style="text-align:right">Δ Precio</th>';
     html += '</tr></thead><tbody>';
 
-    RAW.topRoutes.forEach((r, i) => {
+    top15.forEach((r, i) => {
         const pctWidth = (r.count / maxCount * 100).toFixed(0);
+        const pct = (r.count / data.totalPairs * 100).toFixed(1);
         const color = i < 3 ? 'var(--purple)' : 'var(--accent)';
         html += `<tr>
             <td style="font-weight:500;white-space:nowrap;">${r.from} → ${r.to}</td>
             <td style="text-align:right;font-weight:600;">${fmt(r.count)}</td>
-            <td style="text-align:right;color:var(--t2);">${r.pct}%</td>
+            <td style="text-align:right;color:var(--t2);">${pct}%</td>
             <td><div class="bar-bg"><div class="bar-fill" style="width:${pctWidth}%;background:${color};"></div></div></td>
             <td style="text-align:right;color:var(--green);font-weight:500;">${fmtC(r.avg_delta)}</td>
         </tr>`;
     });
-
     html += '</tbody></table>';
     div.innerHTML = html;
 }
 
-function renderGenChart() {
+function renderGenChart(data) {
     const container = document.getElementById('genChart');
-    const data = RAW.genJumps.filter(g => g.count >= 5).sort((a, b) => a.jump - b.jump);
+    container.innerHTML = '';
+    const chartData = data.genJumps.filter(g => g.count >= 3);
+    if (chartData.length === 0) { container.innerHTML = '<div style="text-align:center;padding:40px;color:#64748b;">Sin datos</div>'; return; }
 
     const W = container.clientWidth || 400;
     const H = 260;
@@ -283,88 +400,64 @@ function renderGenChart() {
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
     const x = d3.scaleBand()
-        .domain(data.map(d => d.jump > 0 ? '+' + d.jump : d.jump.toString()))
+        .domain(chartData.map(d => d.jump > 0 ? '+' + d.jump : d.jump.toString()))
         .range([0, w]).padding(0.15);
 
     const y = d3.scaleLinear()
-        .domain([0, d3.max(data, d => d.pct)]).nice()
+        .domain([0, d3.max(chartData, d => d.pct)]).nice()
         .range([h, 0]);
 
-    // Bars
-    g.selectAll('.bar').data(data).enter().append('rect')
+    g.selectAll('.bar').data(chartData).enter().append('rect')
         .attr('class', 'bar')
         .attr('x', d => x(d.jump > 0 ? '+' + d.jump : d.jump.toString()))
         .attr('y', d => y(d.pct))
         .attr('width', x.bandwidth())
         .attr('height', d => h - y(d.pct))
         .attr('rx', 3)
-        .attr('fill', d => {
-            if (d.jump <= 0) return '#ef4444';
-            if (d.jump <= 1) return '#f59e0b';
-            if (d.jump <= 2) return '#3b82f6';
-            return '#8b5cf6';
-        })
+        .attr('fill', d => d.jump <= 0 ? '#ef4444' : d.jump <= 1 ? '#f59e0b' : d.jump <= 2 ? '#3b82f6' : '#8b5cf6')
         .attr('fill-opacity', 0.8);
 
-    // Value labels on bars
-    g.selectAll('.bar-label').data(data).enter().append('text')
+    g.selectAll('.bar-label').data(chartData).enter().append('text')
         .attr('x', d => x(d.jump > 0 ? '+' + d.jump : d.jump.toString()) + x.bandwidth() / 2)
         .attr('y', d => y(d.pct) - 5)
         .attr('text-anchor', 'middle')
-        .attr('fill', '#94a3b8')
-        .attr('font-size', '10px')
-        .attr('font-weight', '600')
+        .attr('fill', '#94a3b8').attr('font-size', '10px').attr('font-weight', '600')
         .text(d => d.pct.toFixed(1) + '%');
 
-    // X axis
-    g.append('g')
-        .attr('transform', `translate(0,${h})`)
-        .call(d3.axisBottom(x))
+    g.append('g').attr('transform', `translate(0,${h})`).call(d3.axisBottom(x))
         .selectAll('text').style('fill', '#94a3b8').style('font-size', '11px');
-
     g.selectAll('.domain').style('stroke', '#334155');
     g.selectAll('.tick line').style('stroke', '#1e293b');
 
-    // X axis label
-    svg.append('text')
-        .attr('x', W / 2).attr('y', H - 4)
-        .attr('text-anchor', 'middle')
-        .attr('fill', '#64748b').attr('font-size', '11px')
+    svg.append('text').attr('x', W / 2).attr('y', H - 4)
+        .attr('text-anchor', 'middle').attr('fill', '#64748b').attr('font-size', '11px')
         .text('Salto generacional (ej: +2 = iPhone 13 → iPhone 15)');
 
-    // Y axis
-    g.append('g')
-        .call(d3.axisLeft(y).ticks(5).tickFormat(d => d + '%'))
+    g.append('g').call(d3.axisLeft(y).ticks(5).tickFormat(d => d + '%'))
         .selectAll('text').style('fill', '#94a3b8').style('font-size', '10px');
 }
 
 // Tooltip
 const tip = document.getElementById('tip');
 function showTip(e, el) {
-    const from = el.dataset.from;
-    const to = el.dataset.to;
-    const count = parseInt(el.dataset.count);
-    const pct = parseFloat(el.dataset.pct);
-    const avgPur = parseInt(el.dataset.avgpur);
-    const avgRet = parseInt(el.dataset.avgret);
+    const from = el.dataset.from, to = el.dataset.to;
+    const count = parseInt(el.dataset.count), pct = parseFloat(el.dataset.pct);
+    const avgPur = parseInt(el.dataset.avgpur), avgRet = parseInt(el.dataset.avgret);
     tip.innerHTML = `<b>${from} → ${to}</b>
         <div class="r"><span>Trade-Ins</span><span>${fmt(count)}</span></div>
         <div class="r"><span>% de ${from}</span><span>${pct.toFixed(1)}%</span></div>
         <div class="r"><span>Valor Retorno Prom.</span><span>${fmtC(avgRet)}</span></div>
         <div class="r"><span>Valor Compra Prom.</span><span>${fmtC(avgPur)}</span></div>
         <div class="r"><span>Diferencial</span><span style="color:#10b981">${fmtC(avgPur - avgRet)}</span></div>`;
-    tip.style.display = 'block';
-    moveTip(e);
+    tip.style.display = 'block'; moveTip(e);
 }
 function moveTip(e) {
-    const x = e.clientX + 14;
-    const y = e.clientY - 10;
-    tip.style.left = Math.min(x, window.innerWidth - 310) + 'px';
-    tip.style.top = Math.min(y, window.innerHeight - 200) + 'px';
+    tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 310) + 'px';
+    tip.style.top = Math.min(e.clientY - 10, window.innerHeight - 200) + 'px';
 }
 function hideTip() { tip.style.display = 'none'; }
 
-window.addEventListener('resize', function() { if (RAW) { document.getElementById('genChart').innerHTML = ''; renderGenChart(); } });
+window.addEventListener('resize', function() { if (RAW) render(); });
 </script>
 </body>
 </html>
