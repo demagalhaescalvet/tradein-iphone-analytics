@@ -656,6 +656,107 @@ def generate_elasticity(df):
     write_json("elasticity", data)
 
 
+# ── Migration Matrix JSON ─────────────────────────────────────────────
+def generate_migration(df):
+    """Generate migration.json with model-to-model matrix data."""
+    returns = df[df["event"] == "return"]
+    purchases = df[df["event"] == "purchase"]
+
+    ret_m = returns[["Unique_Inmmutable_ID", "Propiedad", "ym", "Product_Value"]].rename(
+        columns={"Propiedad": "from_model", "Product_Value": "ret_val"}
+    )
+    pur_m = purchases[["Unique_Inmmutable_ID", "Propiedad", "Product_Value"]].rename(
+        columns={"Propiedad": "to_model", "Product_Value": "pur_val"}
+    )
+    pairs = ret_m.merge(pur_m, on="Unique_Inmmutable_ID")
+
+    # Sort models by iPhone generation number for logical ordering
+    def model_sort_key(name):
+        import re
+        m = re.search(r'(\d+)', name)
+        num = int(m.group(1)) if m else 0
+        tier = 0
+        if "Pro Max" in name:
+            tier = 3
+        elif "Pro" in name:
+            tier = 2
+        elif "Plus" in name:
+            tier = 1
+        elif "mini" in name.lower() or "SE" in name or "Air" in name or " e" in name.lower():
+            tier = -1
+        return (num, tier)
+
+    from_models = sorted(pairs["from_model"].unique(), key=model_sort_key)
+    to_models = sorted(pairs["to_model"].unique(), key=model_sort_key)
+
+    # Build matrix: for each from_model, what % went to each to_model
+    matrix = []
+    for fm in from_models:
+        subset = pairs[pairs["from_model"] == fm]
+        total = len(subset)
+        avg_ret = safe_int(subset["ret_val"].mean())
+        row_data = {"model": fm, "total": total, "avg_ret_val": avg_ret, "destinations": {}}
+        for tm in to_models:
+            count = len(subset[subset["to_model"] == tm])
+            if count > 0:
+                row_data["destinations"][tm] = {
+                    "count": int(count),
+                    "pct": round(count / total * 100, 1),
+                    "avg_pur": safe_int(subset[subset["to_model"] == tm]["pur_val"].mean()),
+                }
+        matrix.append(row_data)
+
+    # Top routes
+    route_counts = pairs.groupby(["from_model", "to_model"]).agg(
+        count=("pur_val", "size"),
+        avg_ret=("ret_val", "mean"),
+        avg_pur=("pur_val", "mean"),
+    ).reset_index()
+    route_counts["avg_delta"] = route_counts["avg_pur"] - route_counts["avg_ret"]
+    route_counts = route_counts.sort_values("count", ascending=False)
+    top_routes = []
+    for _, r in route_counts.head(15).iterrows():
+        top_routes.append({
+            "from": r["from_model"], "to": r["to_model"],
+            "count": int(r["count"]),
+            "pct": round(r["count"] / len(pairs) * 100, 1),
+            "avg_ret": safe_int(r["avg_ret"]),
+            "avg_pur": safe_int(r["avg_pur"]),
+            "avg_delta": safe_int(r["avg_delta"]),
+        })
+
+    # Upgrade/downgrade/same generation stats
+    def gen_num(name):
+        import re
+        m = re.search(r'(\d+)', name)
+        return int(m.group(1)) if m else 0
+
+    pairs["from_gen"] = pairs["from_model"].apply(gen_num)
+    pairs["to_gen"] = pairs["to_model"].apply(gen_num)
+    pairs["gen_jump"] = pairs["to_gen"] - pairs["from_gen"]
+
+    gen_dist = pairs["gen_jump"].value_counts().sort_index()
+    gen_jumps = [{"jump": int(k), "count": int(v), "pct": round(v / len(pairs) * 100, 1)} for k, v in gen_dist.items()]
+
+    # Monthly volume for timeline
+    monthly = pairs.groupby("ym").size().reset_index(name="count")
+    monthly_data = monthly.to_dict("records")
+
+    data = {
+        "fromModels": from_models,
+        "toModels": to_models,
+        "totalPairs": len(pairs),
+        "dateMin": df["Timestamp"].min().strftime("%Y-%m-%d"),
+        "dateMax": df["Timestamp"].max().strftime("%Y-%m-%d"),
+        "matrix": matrix,
+        "topRoutes": top_routes,
+        "genJumps": gen_jumps,
+        "monthly": monthly_data,
+    }
+
+    write_json("migration", data)
+
+
 # ── Main ───────────────────────────────────────────────────────────────
 def main():
     print("Trade-In iPhone Analytics — Data Pipeline")
@@ -677,6 +778,7 @@ def main():
     generate_curves(df)
     generate_benchmark(bench)
     generate_elasticity(df)
+    generate_migration(df)
 
     print("\n✅ All data files generated successfully!")
     print(f"   Output directory: {OUT_DIR}")

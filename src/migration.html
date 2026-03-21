@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trade-In iPhone — Matriz de Migración</title>
+<style>
+:root {
+    --bg: #0f172a; --card: #1e293b; --border: #334155;
+    --t1: #f1f5f9; --t2: #94a3b8; --t3: #64748b;
+    --accent: #3b82f6; --green: #10b981; --red: #ef4444; --purple: #8b5cf6; --amber: #f59e0b;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:var(--bg); color:var(--t1); }
+.hdr { background:linear-gradient(135deg,#1e293b,#334155); padding:20px 28px; border-bottom:2px solid var(--purple); }
+.hdr h1 { font-size:22px; font-weight:700; }
+.hdr p { color:var(--t2); font-size:13px; margin-top:4px; }
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; padding:14px 28px; }
+.kp { background:var(--card); border-radius:10px; padding:14px 16px; border:1px solid var(--border); }
+.kp .l { font-size:10px; color:var(--t2); text-transform:uppercase; letter-spacing:.3px; }
+.kp .v { font-size:22px; font-weight:700; margin-top:2px; }
+.kp .s { font-size:10px; color:var(--t3); margin-top:2px; }
+.wrap { padding:8px 28px 24px; }
+.crd { background:var(--card); border-radius:12px; border:1px solid var(--border); padding:20px; margin-bottom:16px; }
+.crd h3 { font-size:14px; font-weight:600; margin-bottom:4px; }
+.crd .sub { font-size:11px; color:var(--t3); margin-bottom:14px; }
+.full-width { padding:8px 16px 24px; }
+.full-width .crd { padding:16px; }
+
+/* Matrix styles */
+.matrix-container { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 280px); }
+.matrix-table { border-collapse:separate; border-spacing:1px; }
+.matrix-table th { position:sticky; background:var(--card); z-index:2; font-size:10px; font-weight:600; color:var(--t2); padding:4px 2px; white-space:nowrap; }
+.matrix-table thead th { top:0; z-index:3; }
+.matrix-table .row-header { position:sticky; left:0; z-index:2; background:var(--card); text-align:right; padding-right:8px; min-width:130px; }
+.matrix-table thead .corner { z-index:4; left:0; }
+.matrix-table .col-header { writing-mode:vertical-lr; transform:rotate(180deg); text-align:left; padding:8px 3px; min-width:28px; height:130px; }
+.matrix-cell { width:28px; height:24px; text-align:center; font-size:9px; font-weight:500; cursor:pointer; transition:all 0.15s; border-radius:2px; padding:0 1px; }
+.matrix-cell:hover { outline:2px solid var(--t1); outline-offset:-1px; z-index:1; position:relative; }
+.matrix-cell .pct { display:block; line-height:24px; }
+.empty-cell { background:var(--bg); }
+.row-total { font-size:10px; font-weight:700; color:var(--amber); padding:4px 6px; text-align:center; background:rgba(245,158,11,0.08); }
+.col-total-row td { position:sticky; bottom:0; background:var(--card); }
+
+/* Tooltip */
+.tip { position:fixed; pointer-events:none; background:#1e293bee; border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:12px; color:var(--t1); display:none; box-shadow:0 8px 24px rgba(0,0,0,.4); max-width:300px; z-index:100; }
+.tip b { display:block; font-size:13px; margin-bottom:4px; }
+.tip .r { display:flex; justify-content:space-between; gap:14px; padding:2px 0; }
+.tip .r span:last-child { font-weight:600; }
+
+/* Insights grid */
+.insights-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:900px) { .insights-grid { grid-template-columns:1fr; } }
+
+/* Top routes table */
+.routes-table { width:100%; border-collapse:collapse; font-size:12px; }
+.routes-table th { text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); color:var(--t2); font-size:10px; text-transform:uppercase; letter-spacing:.3px; }
+.routes-table td { padding:7px 10px; border-bottom:1px solid rgba(51,65,85,0.4); }
+.routes-table tr:hover td { background:rgba(59,130,246,0.05); }
+.bar-bg { background:var(--bg); border-radius:4px; height:16px; position:relative; overflow:hidden; }
+.bar-fill { height:100%; border-radius:4px; transition:width 0.6s ease; }
+
+/* Gen jumps chart */
+#genChart { width:100%; }
+
+/* Legend */
+.legend { display:flex; align-items:center; gap:16px; padding:8px 0; flex-wrap:wrap; }
+.legend-gradient { width:200px; height:14px; border-radius:3px; border:1px solid var(--border); }
+.legend span { font-size:10px; color:var(--t3); }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+</head>
+<body>
+<nav style="background:#0c111b;padding:0 28px;display:flex;align-items:center;border-bottom:1px solid #1e293b;font-family:'DM Sans',-apple-system,sans-serif;font-size:13px;height:44px;gap:0;">
+<a href="index.html" style="color:#475569;text-decoration:none;font-weight:600;padding:0 14px 0 0;border-right:1px solid #1e293b;margin-right:4px;display:flex;align-items:center;gap:4px;height:100%;">
+<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Hub</a>
+<a href="dashboard.html" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Dashboard</a>
+<a href="explorer.html" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Explorer</a>
+<a href="sankey.html" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Sankey</a>
+<a href="migration.html" style="color:#f1f5f9;text-decoration:none;padding:10px 14px;border-bottom:2px solid #8b5cf6;font-weight:600;display:flex;align-items:center;gap:5px;height:100%;">Migración</a>
+<a href="insights.html" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;height:100%;">Insights</a>
+<a href="curves.html" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Curvas</a>
+<a href="benchmark.html" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Benchmark</a>
+<a href="elasticity.html" style="color:#64748b;text-decoration:none;padding:10px 14px;border-bottom:2px solid transparent;display:flex;align-items:center;height:100%;">Elasticidad</a>
+</nav>
+
+<div class="hdr">
+    <h1>Trade-In iPhone — Matriz de Migración por Modelo</h1>
+    <p id="subtitle">Flujo completo: de qué iPhone vienen → a qué iPhone compran (en % por fila)</p>
+</div>
+
+<div class="kpis">
+    <div class="kp"><div class="l">Trade-Ins Pareados</div><div class="v" id="k1" style="color:var(--accent)">—</div><div class="s">con retorno + compra identificada</div></div>
+    <div class="kp"><div class="l">Rutas Activas</div><div class="v" id="k2" style="color:var(--purple)">—</div><div class="s">combinaciones from → to</div></div>
+    <div class="kp"><div class="l">Ruta #1</div><div class="v" id="k3" style="color:var(--amber);font-size:14px">—</div><div class="s" id="k3s"></div></div>
+    <div class="kp"><div class="l">Salto Generacional Prom.</div><div class="v" id="k4" style="color:var(--green)">—</div><div class="s">generaciones de iPhone</div></div>
+    <div class="kp"><div class="l">Concentración Top 5</div><div class="v" id="k5" style="color:var(--red)">—</div><div class="s">% en las 5 rutas principales</div></div>
+</div>
+
+<div class="full-width">
+    <div class="crd">
+        <h3>Matriz de Migración — From (entrega) → To (compra)</h3>
+        <div class="sub">Cada celda muestra el % de trade-ins de ese modelo de origen que fue hacia cada destino. Intensidad del color = mayor concentración. Hover para detalles.</div>
+        <div class="legend" id="legend"></div>
+        <div class="matrix-container" id="matrixContainer"></div>
+    </div>
+</div>
+
+<div class="wrap">
+    <div class="insights-grid">
+        <div class="crd">
+            <h3>Top 15 Rutas de Migración</h3>
+            <div class="sub">Las combinaciones from → to más frecuentes</div>
+            <div id="topRoutes"></div>
+        </div>
+        <div class="crd">
+            <h3>Distribución de Salto Generacional</h3>
+            <div class="sub">¿Cuántas generaciones de iPhone saltan los clientes?</div>
+            <div id="genChart"></div>
+        </div>
+    </div>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+let RAW = null;
+const fmt = n => n.toLocaleString('es-CL');
+const fmtC = n => n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+Math.round(n/1e3)+'K':'$'+n;
+
+fetch('data/processed/migration.json')
+    .then(r => r.json())
+    .then(d => { RAW = d; init(); })
+    .catch(e => console.error('Data load error:', e));
+
+function init() {
+    if (!RAW) return;
+    renderKPIs();
+    renderMatrix();
+    renderTopRoutes();
+    renderGenChart();
+}
+
+function renderKPIs() {
+    document.getElementById('k1').textContent = fmt(RAW.totalPairs);
+
+    // Count active routes
+    let routes = 0;
+    RAW.matrix.forEach(row => { routes += Object.keys(row.destinations).length; });
+    document.getElementById('k2').textContent = fmt(routes);
+
+    // Top route
+    const top = RAW.topRoutes[0];
+    document.getElementById('k3').textContent = top.from + ' → ' + top.to;
+    document.getElementById('k3s').textContent = fmt(top.count) + ' trade-ins (' + top.pct + '%)';
+
+    // Avg gen jump
+    let totalJumps = 0, totalCount = 0;
+    RAW.genJumps.forEach(g => { totalJumps += g.jump * g.count; totalCount += g.count; });
+    const avgJump = (totalJumps / totalCount).toFixed(1);
+    document.getElementById('k4').textContent = '+' + avgJump;
+
+    // Top 5 concentration
+    const top5count = RAW.topRoutes.slice(0, 5).reduce((s, r) => s + r.count, 0);
+    document.getElementById('k5').textContent = ((top5count / RAW.totalPairs) * 100).toFixed(1) + '%';
+}
+
+function renderMatrix() {
+    const container = document.getElementById('matrixContainer');
+    const fromModels = RAW.fromModels;
+    const toModels = RAW.toModels;
+
+    // Color scale: 0% → dark bg, high% → bright purple
+    const maxPct = Math.max(...RAW.matrix.flatMap(r => Object.values(r.destinations).map(d => d.pct)));
+    const colorScale = d3.scaleSequential(d3.interpolateRgbBasis([
+        '#1e293b', '#312e81', '#4c1d95', '#7c3aed', '#a78bfa', '#c4b5fd'
+    ])).domain([0, Math.min(maxPct, 30)]);
+
+    // Build table
+    let html = '<table class="matrix-table"><thead><tr>';
+    html += '<th class="corner row-header" style="text-align:center;vertical-align:bottom;font-size:11px;color:var(--red);">FROM ↓ &nbsp;/&nbsp; TO →</th>';
+    toModels.forEach(m => {
+        const short = m.replace('iPhone ', '');
+        html += `<th class="col-header">${short}</th>`;
+    });
+    html += '<th class="col-header" style="color:var(--amber);font-weight:700;">Total</th>';
+    html += '</tr></thead><tbody>';
+
+    RAW.matrix.forEach(row => {
+        const short = row.model.replace('iPhone ', '');
+        html += `<tr><th class="row-header">${short} <span style="color:var(--t3);font-weight:400;font-size:9px;">(${fmt(row.total)})</span></th>`;
+        toModels.forEach(tm => {
+            const dest = row.destinations[tm];
+            if (dest && dest.pct > 0) {
+                const bg = colorScale(dest.pct);
+                const textColor = dest.pct > 8 ? '#f1f5f9' : '#94a3b8';
+                const label = dest.pct >= 1 ? dest.pct.toFixed(0) + '%' : '<1%';
+                html += `<td class="matrix-cell" style="background:${bg};color:${textColor};"
+                    data-from="${row.model}" data-to="${tm}" data-count="${dest.count}" data-pct="${dest.pct}"
+                    data-avgpur="${dest.avg_pur}" data-avgret="${row.avg_ret_val}"
+                    onmouseenter="showTip(event,this)" onmousemove="moveTip(event)" onmouseleave="hideTip()">
+                    <span class="pct">${label}</span></td>`;
+            } else {
+                html += '<td class="matrix-cell empty-cell"></td>';
+            }
+        });
+        html += `<td class="row-total">${fmt(row.total)}</td>`;
+        html += '</tr>';
+    });
+
+    // Column totals row
+    html += '<tr class="col-total-row"><th class="row-header" style="color:var(--amber);font-weight:700;font-size:10px;">TOTAL</th>';
+    toModels.forEach(tm => {
+        let colTotal = 0;
+        RAW.matrix.forEach(row => {
+            if (row.destinations[tm]) colTotal += row.destinations[tm].count;
+        });
+        html += `<td style="text-align:center;font-size:9px;font-weight:600;color:var(--amber);background:rgba(245,158,11,0.06);padding:4px 2px;">${colTotal > 0 ? fmt(colTotal) : ''}</td>`;
+    });
+    html += `<td class="row-total" style="color:var(--accent);font-weight:800;">${fmt(RAW.totalPairs)}</td>`;
+    html += '</tr></tbody></table>';
+
+    container.innerHTML = html;
+
+    // Build legend
+    const legendDiv = document.getElementById('legend');
+    const canvas = document.createElement('canvas');
+    canvas.width = 200; canvas.height = 14;
+    const ctx = canvas.getContext('2d');
+    for (let i = 0; i < 200; i++) {
+        ctx.fillStyle = colorScale((i / 200) * Math.min(maxPct, 30));
+        ctx.fillRect(i, 0, 1, 14);
+    }
+    canvas.style.borderRadius = '3px';
+    canvas.style.border = '1px solid var(--border)';
+    legendDiv.innerHTML = '<span>0%</span>';
+    legendDiv.appendChild(canvas);
+    legendDiv.innerHTML += `<span>${Math.min(maxPct, 30).toFixed(0)}%+</span><span style="margin-left:16px;color:var(--t2);">= % de trade-ins del modelo FROM que fueron a cada modelo TO</span>`;
+}
+
+function renderTopRoutes() {
+    const div = document.getElementById('topRoutes');
+    const maxCount = RAW.topRoutes[0].count;
+
+    let html = '<table class="routes-table"><thead><tr>';
+    html += '<th>Ruta</th><th style="text-align:right">Trade-Ins</th><th style="text-align:right">%</th>';
+    html += '<th style="width:120px">Volumen</th>';
+    html += '<th style="text-align:right">Δ Precio</th>';
+    html += '</tr></thead><tbody>';
+
+    RAW.topRoutes.forEach((r, i) => {
+        const pctWidth = (r.count / maxCount * 100).toFixed(0);
+        const color = i < 3 ? 'var(--purple)' : 'var(--accent)';
+        html += `<tr>
+            <td style="font-weight:500;white-space:nowrap;">${r.from} → ${r.to}</td>
+            <td style="text-align:right;font-weight:600;">${fmt(r.count)}</td>
+            <td style="text-align:right;color:var(--t2);">${r.pct}%</td>
+            <td><div class="bar-bg"><div class="bar-fill" style="width:${pctWidth}%;background:${color};"></div></div></td>
+            <td style="text-align:right;color:var(--green);font-weight:500;">${fmtC(r.avg_delta)}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    div.innerHTML = html;
+}
+
+function renderGenChart() {
+    const container = document.getElementById('genChart');
+    const data = RAW.genJumps.filter(g => g.count >= 5).sort((a, b) => a.jump - b.jump);
+
+    const W = container.clientWidth || 400;
+    const H = 260;
+    const margin = {top: 20, right: 20, bottom: 40, left: 50};
+    const w = W - margin.left - margin.right;
+    const h = H - margin.top - margin.bottom;
+
+    const svg = d3.select(container).append('svg')
+        .attr('width', W).attr('height', H)
+        .attr('viewBox', `0 0 ${W} ${H}`)
+        .style('width', '100%');
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const x = d3.scaleBand()
+        .domain(data.map(d => d.jump > 0 ? '+' + d.jump : d.jump.toString()))
+        .range([0, w]).padding(0.15);
+
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.pct)]).nice()
+        .range([h, 0]);
+
+    // Bars
+    g.selectAll('.bar').data(data).enter().append('rect')
+        .attr('class', 'bar')
+        .attr('x', d => x(d.jump > 0 ? '+' + d.jump : d.jump.toString()))
+        .attr('y', d => y(d.pct))
+        .attr('width', x.bandwidth())
+        .attr('height', d => h - y(d.pct))
+        .attr('rx', 3)
+        .attr('fill', d => {
+            if (d.jump <= 0) return '#ef4444';
+            if (d.jump <= 1) return '#f59e0b';
+            if (d.jump <= 2) return '#3b82f6';
+            return '#8b5cf6';
+        })
+        .attr('fill-opacity', 0.8);
+
+    // Value labels on bars
+    g.selectAll('.bar-label').data(data).enter().append('text')
+        .attr('x', d => x(d.jump > 0 ? '+' + d.jump : d.jump.toString()) + x.bandwidth() / 2)
+        .attr('y', d => y(d.pct) - 5)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#94a3b8')
+        .attr('font-size', '10px')
+        .attr('font-weight', '600')
+        .text(d => d.pct.toFixed(1) + '%');
+
+    // X axis
+    g.append('g')
+        .attr('transform', `translate(0,${h})`)
+        .call(d3.axisBottom(x))
+        .selectAll('text').style('fill', '#94a3b8').style('font-size', '11px');
+
+    g.selectAll('.domain').style('stroke', '#334155');
+    g.selectAll('.tick line').style('stroke', '#1e293b');
+
+    // X axis label
+    svg.append('text')
+        .attr('x', W / 2).attr('y', H - 4)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#64748b').attr('font-size', '11px')
+        .text('Salto generacional (ej: +2 = iPhone 13 → iPhone 15)');
+
+    // Y axis
+    g.append('g')
+        .call(d3.axisLeft(y).ticks(5).tickFormat(d => d + '%'))
+        .selectAll('text').style('fill', '#94a3b8').style('font-size', '10px');
+}
+
+// Tooltip
+const tip = document.getElementById('tip');
+function showTip(e, el) {
+    const from = el.dataset.from;
+    const to = el.dataset.to;
+    const count = parseInt(el.dataset.count);
+    const pct = parseFloat(el.dataset.pct);
+    const avgPur = parseInt(el.dataset.avgpur);
+    const avgRet = parseInt(el.dataset.avgret);
+    tip.innerHTML = `<b>${from} → ${to}</b>
+        <div class="r"><span>Trade-Ins</span><span>${fmt(count)}</span></div>
+        <div class="r"><span>% de ${from}</span><span>${pct.toFixed(1)}%</span></div>
+        <div class="r"><span>Valor Retorno Prom.</span><span>${fmtC(avgRet)}</span></div>
+        <div class="r"><span>Valor Compra Prom.</span><span>${fmtC(avgPur)}</span></div>
+        <div class="r"><span>Diferencial</span><span style="color:#10b981">${fmtC(avgPur - avgRet)}</span></div>`;
+    tip.style.display = 'block';
+    moveTip(e);
+}
+function moveTip(e) {
+    const x = e.clientX + 14;
+    const y = e.clientY - 10;
+    tip.style.left = Math.min(x, window.innerWidth - 310) + 'px';
+    tip.style.top = Math.min(y, window.innerHeight - 200) + 'px';
+}
+function hideTip() { tip.style.display = 'none'; }
+
+window.addEventListener('resize', function() { if (RAW) { document.getElementById('genChart').innerHTML = ''; renderGenChart(); } });
+</script>
+</body>
+</html>
