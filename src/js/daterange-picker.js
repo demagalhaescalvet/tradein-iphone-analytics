@@ -312,8 +312,8 @@ class DateRangePicker {
 
 .drp-trigger {
   display: flex; align-items: center; gap: 10px;
-  padding: 9px 16px; border-radius: 10px;
-  background: linear-gradient(135deg, #1e293b 0%, #253349 100%);
+  padding: 8px 12px; border-radius: 8px;
+  background: #0f172a;
   border: 1px solid #334155; color: #e2e8f0;
   font-family: inherit; font-size: 13px; font-weight: 500;
   cursor: pointer; transition: all 0.2s; white-space: nowrap;
