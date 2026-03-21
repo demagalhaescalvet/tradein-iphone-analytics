@@ -150,10 +150,13 @@ fetch('data/processed/benchmark.json')
 const fmt = n => n!=null ? '$'+n.toLocaleString('es-CL') : '—';
 const fmtD = n => n>=0 ? '+$'+n.toLocaleString('es-CL') : '-$'+Math.abs(n).toLocaleString('es-CL');
 
-RAW.models.forEach(m => document.getElementById('fModel').add(new Option(m, m)));
-function resetF(){ document.getElementById('fModel').value='all'; document.getElementById('fGen').value='all'; document.getElementById('fView').value='all'; function initBenchmark() {
+function resetF(){
+  if (!RAW) return;
+  document.getElementById('fModel').value='all';
+  document.getElementById('fGen').value='all';
+  document.getElementById('fView').value='all';
   render();
-} }
+}
 
 function getFiltered(){
     const model = document.getElementById('fModel').value;
@@ -168,6 +171,7 @@ function getFiltered(){
 }
 
 function render(){
+    if (!RAW) return;
     const data = getFiltered();
     renderKPIs(data);
     renderTable(data);
@@ -371,6 +375,8 @@ function showTooltip(e, text) {
 function hideTooltip() { if(tooltipDiv) tooltipDiv.style('opacity', 0); }
 
 function initBenchmark() {
+  if (!RAW) return;
+  RAW.models.forEach(m => document.getElementById('fModel').add(new Option(m, m)));
   render();
 }
 </script>

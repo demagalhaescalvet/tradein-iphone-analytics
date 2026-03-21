@@ -241,6 +241,7 @@ function initElasticity() {
 }
 
 function render() {
+  if (!RAW) return;
   selectedModel = document.getElementById('modelSelect').value;
   if (!selectedModel) return;
 

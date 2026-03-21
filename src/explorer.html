@@ -867,17 +867,11 @@ class Dashboard {
     }
 }
 
-function initExplorer() {
-    const dashboard = new Dashboard();
-}
+let dashboard = null;
 
-// Load data and initialize when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        if (RAW) initExplorer();
-    });
-} else if (RAW) {
-    initExplorer();
+function initExplorer() {
+    if (!RAW) return;
+    dashboard = new Dashboard();
 }
 </script>
 </body>

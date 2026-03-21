@@ -123,6 +123,7 @@ fetch('data/processed/sankey.json')
     .catch(e => console.error('Data load error:', e));
 
 function resetF(){
+    if (!RAW) return;
     document.getElementById('fFrom').value='all';
     document.getElementById('fTo').value='all';
     document.getElementById('fDS').value='2023-07-01';

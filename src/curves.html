@@ -133,6 +133,7 @@ const fmt=n=>n.toLocaleString('es-CL');
 const fmtC=n=>n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+Math.round(n/1e3)+'K':'$'+n;
 
 function resetF(){
+  if (!RAW) return;
   document.getElementById('fModel').value='iPhone 13';
   document.getElementById('fGrade').value='both';
   document.getElementById('fDS').value=RAW.dateMin;
@@ -488,7 +489,7 @@ function renderSpreadChart(){
   });
   const spreadMonths=Object.keys(spreadByMonth).sort();
   const spreadData=spreadMonths.map(m=>{
-    const a=spreadByMonth[m]['GRADO A'], b=spreadByMonth[m]['GRADO B'];
+    const a=spreadByMonth[m]['Grado A'], b=spreadByMonth[m]['Grado B'];
     return {x:m, y:(a&&b)?a-b:null};
   }).filter(d=>d.y!==null);
 
@@ -660,6 +661,7 @@ function renderCorrTable(){
 }
 
 function render(){
+  if (!RAW) return;
   const model=document.getElementById('fModel').value;
   const grade=document.getElementById('fGrade').value;
 
@@ -703,7 +705,7 @@ function render(){
   });
   const spreadMonths=Object.keys(spreadByMonth).sort();
   const spreadVals=spreadMonths.map(m=>{
-    const a=spreadByMonth[m]['GRADO A'], b=spreadByMonth[m]['GRADO B'];
+    const a=spreadByMonth[m]['Grado A'], b=spreadByMonth[m]['Grado B'];
     return(a&&b)?a-b:null;
   }).filter(v=>v!==null);
 
