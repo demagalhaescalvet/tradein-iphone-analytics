@@ -32,7 +32,7 @@ import pandas as pd
 # ── Paths ──────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).resolve().parent
 DATA_DIR = SCRIPT_DIR.parent / "data"
-OUT_DIR = DATA_DIR / "processed"
+OUT_DIR = SCRIPT_DIR.parent / "src" / "data" / "processed"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 HISTORICO = DATA_DIR / "TD Historico.xlsx"
@@ -437,14 +437,14 @@ def generate_insights(df):
     )
     cap_data = cap_data.rename(columns={"cap_change": "change"})
 
-    # Retention of value (avg return value by model over time)
+    # Retention of value (% of purchase price covered by trade-in)
+    pairs["retention_pct"] = pairs["ret_val"] / pairs["pur_val"] * 100
     retention = (
-        returns.groupby(["ym", "Propiedad"])
-        .agg(avg_ret=("Product_Value", "mean"), count=("Product_Value", "size"))
+        pairs.groupby(["ym", "from_model"])
+        .agg(avg_ret=("retention_pct", "mean"), count=("retention_pct", "size"))
         .reset_index()
     )
-    retention = retention.rename(columns={"Propiedad": "from_model"})
-    retention["avg_ret"] = retention["avg_ret"].apply(safe_int)
+    retention["avg_ret"] = retention["avg_ret"].round(1)
 
     # Grading impact on value
     ret_graded = returns[returns["Grading"].notna()].copy()
