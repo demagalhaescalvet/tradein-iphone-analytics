@@ -23,6 +23,7 @@ Writes to:
 import json
 import math
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -55,10 +56,15 @@ def safe_float(x, decimals=4):
 
 
 def write_json(name, data):
-    """Write JSON file to output directory."""
+    """Write JSON file to output directory, sanitizing NaN/Inf to null."""
     path = OUT_DIR / f"{name}.json"
+    text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    # Replace any NaN or Infinity that leaked through pandas → valid JSON null
+    text = re.sub(r'\bNaN\b', 'null', text)
+    text = re.sub(r'\bInfinity\b', 'null', text)
+    text = re.sub(r'\b-Infinity\b', 'null', text)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+        f.write(text)
     size_kb = path.stat().st_size / 1024
     print(f"  ✓ {name}.json ({size_kb:.1f} KB)")
 
@@ -630,6 +636,18 @@ def generate_elasticity(df):
             # Elasticity = %change in volume / %change in price
             elasticity = slope  # Already normalized, this is the standardized coefficient
 
+            # Build scatter data (priceChg vs volAdj change)
+            scatter_points = []
+            for _, row in monthly.iterrows():
+                pc = row.get("priceChg")
+                vc = row.get("volChg")
+                if pd.notna(pc) and pd.notna(vc):
+                    scatter_points.append({
+                        "ym": row["ym"],
+                        "x": safe_float(pc),
+                        "y": safe_float(vc),
+                    })
+
             elasticity_results.append({
                 "model": model,
                 "elasticity": safe_float(elasticity),
@@ -639,6 +657,7 @@ def generate_elasticity(df):
                 "n": n,
                 "avgVol": safe_int(vol_vals.mean()),
                 "significant": p_val < 0.05,
+                "scatter": scatter_points,
             })
 
         # Series data
