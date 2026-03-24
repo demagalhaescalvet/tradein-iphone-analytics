@@ -319,6 +319,18 @@ def generate_explorer(df):
         .reset_index(name="count")
     )
 
+    # Weekly aggregation by model and event
+    df_copy2 = df.copy()
+    df_copy2["yw"] = df_copy2["Timestamp"].dt.isocalendar().year.astype(str) + "-W" + df_copy2["Timestamp"].dt.isocalendar().week.astype(str).str.zfill(2)
+    df_copy2["week_start"] = df_copy2["Timestamp"].dt.to_period("W-SUN").apply(lambda p: p.start_time.strftime("%Y-%m-%d"))
+    weekly = (
+        df_copy2.groupby(["yw", "week_start", "Propiedad", "event"])
+        .agg(count=("Product_Value", "size"), avg_value=("Product_Value", "mean"), total_value=("Product_Value", "sum"))
+        .reset_index()
+    )
+    weekly["avg_value"] = weekly["avg_value"].apply(safe_int)
+    weekly["total_value"] = weekly["total_value"].apply(safe_int)
+
     # Capacity breakdown
     cap = (
         df.groupby(["Propiedad", "event", "Capacidad"]).size()
@@ -330,6 +342,7 @@ def generate_explorer(df):
         "dateMin": df["Timestamp"].min().strftime("%Y-%m-%d"),
         "dateMax": df["Timestamp"].max().strftime("%Y-%m-%d"),
         "monthly": monthly.to_dict("records"),
+        "weekly": weekly.to_dict("records"),
         "migration": mig.to_dict("records"),
         "seasonMonth": season_month.to_dict("records"),
         "seasonDow": season_dow.to_dict("records"),

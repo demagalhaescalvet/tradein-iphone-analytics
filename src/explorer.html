@@ -130,8 +130,16 @@ canvas { max-height: 320px; }
 <div class="grid">
     <!-- VOLUME TREND -->
     <div class="card full">
-        <h3>Tendencia Mensual de Volumen</h3>
-        <p class="subtitle">Cantidad de transacciones por mes en el rango seleccionado</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <div>
+                <h3 id="volumeTitle" style="margin-bottom:0">Tendencia Mensual de Volumen</h3>
+                <p class="subtitle" id="volumeSubtitle" style="margin-top:4px">Cantidad de transacciones por mes en el rango seleccionado</p>
+            </div>
+            <div class="tab-bar" style="margin-bottom:0;">
+                <button class="tab active" data-granularity="monthly" onclick="dashboard.setGranularity('monthly',this)">Mensual</button>
+                <button class="tab" data-granularity="weekly" onclick="dashboard.setGranularity('weekly',this)">Semanal</button>
+            </div>
+        </div>
         <div id="volumeChart"></div>
     </div>
 
@@ -198,6 +206,7 @@ fetch('data/processed/explorer.json')
 class Dashboard {
     constructor() {
         this.charts = {};
+        this._granularity = 'monthly';
         this.populateFilters();
         this.setDefaultDates();
         this.createTooltip();
@@ -291,6 +300,32 @@ class Dashboard {
         });
     }
 
+    filterWeekly(f) {
+        return (RAW.weekly || []).filter(r => {
+            if (f.model !== 'all' && r.Propiedad !== f.model) return false;
+            if (f.event !== 'all' && r.event !== f.event) return false;
+            if (f.start && r.week_start < f.start) return false;
+            if (f.end && r.week_start > f.end) return false;
+            return true;
+        });
+    }
+
+    setGranularity(g, btn) {
+        this._granularity = g;
+        document.querySelectorAll('.tab-bar .tab[data-granularity]').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        const title = document.getElementById('volumeTitle');
+        const subtitle = document.getElementById('volumeSubtitle');
+        if (g === 'weekly') {
+            title.textContent = 'Tendencia Semanal de Volumen';
+            subtitle.textContent = 'Cantidad de transacciones por semana en el rango seleccionado';
+        } else {
+            title.textContent = 'Tendencia Mensual de Volumen';
+            subtitle.textContent = 'Cantidad de transacciones por mes en el rango seleccionado';
+        }
+        this.applyFilters();
+    }
+
     filterSeason(data, f) {
         return data.filter(r => {
             if (f.model !== 'all' && r.Propiedad !== f.model) return false;
@@ -324,7 +359,15 @@ class Dashboard {
         });
 
         this.renderKPIs(monthly);
-        this.renderVolumeChart(monthly);
+
+        // Volume chart: use weekly or monthly based on toggle
+        if (this._granularity === 'weekly') {
+            const weekly = this.filterWeekly(f);
+            this.renderVolumeChartWeekly(weekly);
+        } else {
+            this.renderVolumeChart(monthly);
+        }
+
         this.renderSeasonMonth(seasonM);
         this.renderSeasonDow(seasonD);
         this.renderYoY(monthly);
@@ -483,6 +526,85 @@ class Dashboard {
             .attr('fill', '#10b981')
             .attr('rx', 4)
             .on('mouseover', (e, d) => this.showTooltip(`Purchases: ${fmt(d.purchases)}`, e.clientX, e.clientY))
+            .on('mouseout', () => this.hideTooltip());
+    }
+
+    renderVolumeChartWeekly(data) {
+        const byWeek = {};
+        data.forEach(r => {
+            const key = r.week_start;
+            if (!byWeek[key]) byWeek[key] = {return: 0, purchase: 0, yw: r.yw};
+            byWeek[key][r.event] += r.count;
+        });
+        const labels = Object.keys(byWeek).sort();
+        const chartData = labels.map(l => ({ week: l, yw: byWeek[l].yw, returns: byWeek[l].return, purchases: byWeek[l].purchase }));
+
+        const container = document.getElementById('volumeChart');
+        container.innerHTML = '';
+
+        if (chartData.length === 0) {
+            container.innerHTML = '<div class="empty-state">Sin datos semanales para el rango seleccionado</div>';
+            return;
+        }
+
+        const margin = { top: 20, right: 20, bottom: 50, left: 50 };
+        const width = 900 - margin.left - margin.right;
+        const height = 320 - margin.top - margin.bottom;
+
+        const svg = d3.select(container)
+            .append('svg')
+            .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+            .attr('style', 'width: 100%; height: auto;')
+            .append('g')
+            .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleBand().domain(chartData.map(d => d.week)).range([0, width]).padding(0.15);
+        const x1 = d3.scaleBand().domain(['returns', 'purchases']).range([0, x.bandwidth()]).padding(0.05);
+        const y = d3.scaleLinear().domain([0, d3.max(chartData, d => Math.max(d.returns, d.purchases)) * 1.05]).range([height, 0]);
+
+        // X axis — show every Nth label to avoid overlap
+        const step = Math.max(1, Math.ceil(chartData.length / 20));
+        svg.append('g').attr('transform', `translate(0,${height})`)
+            .call(d3.axisBottom(x).tickSize(0).tickValues(chartData.filter((d,i) => i % step === 0).map(d => d.week)))
+            .attr('color', '#94a3b8')
+            .selectAll('text')
+            .attr('font-size', '10px').attr('fill', '#94a3b8')
+            .attr('transform', 'rotate(-45)')
+            .attr('text-anchor', 'end')
+            .attr('dx', '-6px').attr('dy', '4px');
+
+        svg.append('g')
+            .call(d3.axisLeft(y).tickSize(-width))
+            .attr('color', '#334155')
+            .selectAll('text').attr('fill', '#94a3b8').attr('font-size', '12px');
+
+        svg.selectAll('.tick line').attr('stroke', '#334155').attr('stroke-dasharray', '2,2');
+        svg.selectAll('.domain').attr('stroke', '#334155');
+
+        const groups = svg.selectAll('g.group')
+            .data(chartData)
+            .enter().append('g')
+            .attr('class', 'group')
+            .attr('transform', d => `translate(${x(d.week)},0)`);
+
+        groups.append('rect')
+            .attr('x', d => x1('returns'))
+            .attr('y', d => y(d.returns))
+            .attr('width', x1.bandwidth())
+            .attr('height', d => height - y(d.returns))
+            .attr('fill', '#ef4444')
+            .attr('rx', 3)
+            .on('mouseover', (e, d) => this.showTooltip(`Sem ${d.week}\nReturns: ${fmt(d.returns)}`, e.clientX, e.clientY))
+            .on('mouseout', () => this.hideTooltip());
+
+        groups.append('rect')
+            .attr('x', d => x1('purchases'))
+            .attr('y', d => y(d.purchases))
+            .attr('width', x1.bandwidth())
+            .attr('height', d => height - y(d.purchases))
+            .attr('fill', '#10b981')
+            .attr('rx', 3)
+            .on('mouseover', (e, d) => this.showTooltip(`Sem ${d.week}\nPurchases: ${fmt(d.purchases)}`, e.clientX, e.clientY))
             .on('mouseout', () => this.hideTooltip());
     }
 
