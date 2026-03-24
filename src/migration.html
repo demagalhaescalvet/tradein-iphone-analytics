@@ -30,17 +30,22 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Ro
 /* Matrix styles */
 .matrix-container { overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 280px); }
 .matrix-table { border-collapse:separate; border-spacing:1px; }
-.matrix-table th { position:sticky; background:var(--card); z-index:2; font-size:10px; font-weight:600; color:var(--t2); padding:4px 2px; white-space:nowrap; }
+.matrix-table th { position:sticky; background:var(--card); z-index:2; font-size:11px; font-weight:600; color:var(--t2); padding:4px 4px; white-space:nowrap; }
 .matrix-table thead th { top:0; z-index:3; }
-.matrix-table .row-header { position:sticky; left:0; z-index:2; background:var(--card); text-align:right; padding-right:8px; min-width:130px; }
+.matrix-table .row-header { position:sticky; left:0; z-index:2; background:var(--card); text-align:right; padding-right:10px; min-width:150px; font-size:11px; }
 .matrix-table thead .corner { z-index:4; left:0; }
-.matrix-table .col-header { writing-mode:vertical-lr; transform:rotate(180deg); text-align:left; padding:8px 3px; min-width:28px; height:130px; }
-.matrix-cell { width:28px; height:24px; text-align:center; font-size:9px; font-weight:500; cursor:pointer; transition:all 0.15s; border-radius:2px; padding:0 1px; }
-.matrix-cell:hover { outline:2px solid var(--t1); outline-offset:-1px; z-index:1; position:relative; }
-.matrix-cell .pct { display:block; line-height:24px; }
-.empty-cell { background:var(--bg); }
-.row-total { font-size:10px; font-weight:700; color:var(--amber); padding:4px 6px; text-align:center; background:rgba(245,158,11,0.08); }
+.matrix-table .col-header { height:100px; vertical-align:bottom; text-align:left; padding:0 2px 8px; min-width:40px; position:relative; }
+.matrix-table .col-header span { display:block; transform:rotate(-50deg); transform-origin:left bottom; white-space:nowrap; font-size:11px; position:absolute; bottom:8px; left:50%; }
+.matrix-cell { width:40px; height:30px; text-align:center; font-size:10px; font-weight:600; cursor:pointer; transition:all 0.15s; border-radius:3px; padding:0 2px; position:relative; }
+.matrix-cell:hover { outline:2px solid #f1f5f9; outline-offset:-1px; z-index:5; transform:scale(1.15); box-shadow:0 0 12px rgba(139,92,246,0.5); }
+.matrix-cell .pct { display:block; line-height:30px; }
+.empty-cell { background:rgba(15,23,42,0.4); }
+.row-total { font-size:11px; font-weight:700; color:var(--amber); padding:4px 8px; text-align:center; background:rgba(245,158,11,0.08); }
 .col-total-row td { position:sticky; bottom:0; background:var(--card); }
+/* Row hover highlight */
+.matrix-table tbody tr:hover th.row-header { color:var(--t1); background:rgba(59,130,246,0.12); }
+.matrix-table tbody tr:hover .matrix-cell { opacity:1; }
+.matrix-table tbody tr:hover .empty-cell { background:rgba(30,41,59,0.6); }
 
 /* Tooltip */
 .tip { position:fixed; pointer-events:none; background:#1e293bee; border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:12px; color:var(--t1); display:none; box-shadow:0 8px 24px rgba(0,0,0,.4); max-width:300px; z-index:100; }
@@ -295,28 +300,35 @@ function renderMatrix(data) {
     }
 
     const maxPct = Math.max(...data.matrix.flatMap(r => Object.values(r.destinations).map(d => d.pct)), 1);
+    const clampMax = Math.min(maxPct, 35);
     const colorScale = d3.scaleSequential(d3.interpolateRgbBasis([
-        '#1e293b', '#312e81', '#4c1d95', '#7c3aed', '#a78bfa', '#c4b5fd'
-    ])).domain([0, Math.min(maxPct, 30)]);
+        '#0f172a', '#1e1b4b', '#312e81', '#4338ca', '#6366f1', '#818cf8', '#a5b4fc'
+    ])).domain([0, clampMax]);
 
     let html = '<table class="matrix-table"><thead><tr>';
-    html += '<th class="corner row-header" style="text-align:center;vertical-align:bottom;font-size:11px;color:var(--red);">FROM ↓ &nbsp;/&nbsp; TO →</th>';
+    html += '<th class="corner row-header" style="text-align:center;vertical-align:bottom;font-size:11px;color:var(--red);">ENTREGA ↓ / COMPRA →</th>';
     toModels.forEach(m => {
-        html += `<th class="col-header">${m.replace('iPhone ', '')}</th>`;
+        const short = m.replace('iPhone ', '');
+        html += `<th class="col-header"><span>${short}</span></th>`;
     });
-    html += '<th class="col-header" style="color:var(--amber);font-weight:700;">Total</th>';
+    html += '<th style="color:var(--amber);font-weight:700;font-size:10px;vertical-align:bottom;padding-bottom:8px;">Total</th>';
     html += '</tr></thead><tbody>';
 
     data.matrix.forEach(row => {
         const short = row.model.replace('iPhone ', '');
-        html += `<tr><th class="row-header">${short} <span style="color:var(--t3);font-weight:400;font-size:9px;">(${fmt(row.total)})</span></th>`;
+        html += `<tr><th class="row-header">${short} <span style="color:var(--t3);font-weight:400;font-size:10px;">(${fmt(row.total)})</span></th>`;
         toModels.forEach(tm => {
             const dest = row.destinations[tm];
             if (dest && dest.pct > 0) {
                 const bg = colorScale(dest.pct);
-                const textColor = dest.pct > 8 ? '#f1f5f9' : '#94a3b8';
-                const label = dest.pct >= 1 ? dest.pct.toFixed(0) + '%' : '<1%';
-                html += `<td class="matrix-cell" style="background:${bg};color:${textColor};"
+                const isHigh = dest.pct >= 10;
+                const isMid = dest.pct >= 3;
+                const textColor = isHigh ? '#ffffff' : isMid ? '#e2e8f0' : '#94a3b8';
+                // Only show label for values >= 2%, show dot for 1%, hide <1%
+                let label = '';
+                if (dest.pct >= 2) label = dest.pct.toFixed(0) + '%';
+                else if (dest.pct >= 1) label = '·';
+                html += `<td class="matrix-cell" style="background:${bg};color:${textColor};${isHigh ? 'font-weight:700;' : ''}"
                     data-from="${row.model}" data-to="${tm}" data-count="${dest.count}" data-pct="${dest.pct}"
                     data-avgpur="${dest.avg_pur}" data-avgret="${row.avg_ret_val}"
                     onmouseenter="showTip(event,this)" onmousemove="moveTip(event)" onmouseleave="hideTip()">
@@ -329,10 +341,10 @@ function renderMatrix(data) {
         html += '</tr>';
     });
 
-    html += '<tr class="col-total-row"><th class="row-header" style="color:var(--amber);font-weight:700;font-size:10px;">TOTAL</th>';
+    html += '<tr class="col-total-row"><th class="row-header" style="color:var(--amber);font-weight:700;font-size:11px;">TOTAL</th>';
     toModels.forEach(tm => {
         const ct = data.colTotals[tm] || 0;
-        html += `<td style="text-align:center;font-size:9px;font-weight:600;color:var(--amber);background:rgba(245,158,11,0.06);padding:4px 2px;">${ct > 0 ? fmt(ct) : ''}</td>`;
+        html += `<td style="text-align:center;font-size:10px;font-weight:600;color:var(--amber);background:rgba(245,158,11,0.06);padding:4px 2px;">${ct > 0 ? fmt(ct) : ''}</td>`;
     });
     html += `<td class="row-total" style="color:var(--accent);font-weight:800;">${fmt(data.totalPairs)}</td>`;
     html += '</tr></tbody></table>';
@@ -344,14 +356,14 @@ function renderMatrix(data) {
     canvas.width = 200; canvas.height = 14;
     const ctx = canvas.getContext('2d');
     for (let i = 0; i < 200; i++) {
-        ctx.fillStyle = colorScale((i / 200) * Math.min(maxPct, 30));
+        ctx.fillStyle = colorScale((i / 200) * clampMax);
         ctx.fillRect(i, 0, 1, 14);
     }
     canvas.style.borderRadius = '3px';
     canvas.style.border = '1px solid var(--border)';
     legendDiv.innerHTML = '<span>0%</span>';
     legendDiv.appendChild(canvas);
-    legendDiv.innerHTML += `<span>${Math.min(maxPct, 30).toFixed(0)}%+</span><span style="margin-left:16px;color:var(--t2);">= % de trade-ins del modelo FROM que fueron a cada modelo TO</span>`;
+    legendDiv.innerHTML += `<span>${clampMax.toFixed(0)}%+</span><span style="margin-left:12px;color:var(--t3);font-size:10px;">· = 1%&nbsp;&nbsp;vacío = &lt;1%</span>`;
 }
 
 function renderTopRoutes(data) {
