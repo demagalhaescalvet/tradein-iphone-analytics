@@ -148,7 +148,7 @@ function initSankey() {
     render();
 }
 
-fetch('data/processed/sankey.json')
+fetch('data/processed/sankey.json?v=' + Date.now())
     .then(r => r.json())
     .then(d => { RAW = d; initSankey(); })
     .catch(e => console.error('Data load error:', e));

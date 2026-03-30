@@ -116,7 +116,7 @@ nav .back { padding:0 14px 0 0; border-right:1px solid var(--border); margin-rig
 <script>
 let RAW = null;
 
-fetch('data/processed/curves.json')
+fetch('data/processed/curves.json?v=' + Date.now())
   .then(r => r.json())
   .then(d => { RAW = d; initCurves(); })
   .catch(e => console.error('Data load error:', e));

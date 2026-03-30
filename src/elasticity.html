@@ -207,7 +207,7 @@
 <script>
 let RAW = null;
 
-fetch('data/processed/elasticity.json')
+fetch('data/processed/elasticity.json?v=' + Date.now())
   .then(r => r.json())
   .then(d => { RAW = d; initElasticity(); })
   .catch(e => console.error('Data load error:', e));

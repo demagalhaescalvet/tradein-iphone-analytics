@@ -139,7 +139,7 @@ let RAW = null;
 const fmt = n => n.toLocaleString('es-CL');
 const fmtC = n => n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+Math.round(n/1e3)+'K':'$'+n;
 
-fetch('data/processed/migration.json')
+fetch('data/processed/migration.json?v=' + Date.now())
     .then(r => r.json())
     .then(d => { RAW = d; initMigration(); })
     .catch(e => console.error('Data load error:', e));

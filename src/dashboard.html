@@ -614,11 +614,11 @@ function initDashboard() {
 }
 
 // Load data from external JSON and initialize
-fetch('data/processed/dashboard.json')
+fetch('data/processed/dashboard.json?v=' + Date.now())
     .then(r => r.json())
-    .then(d => { 
-        DATA = d; 
-        initDashboard(); 
+    .then(d => {
+        DATA = d;
+        initDashboard();
     })
     .catch(e => console.error('Data load error:', e));
 </script>

@@ -198,7 +198,7 @@ function fmtCLP(n) {
     if (n >= 1e3) return '$' + (n/1e3).toFixed(0) + 'K';
     return '$' + n.toFixed(0);
 }
-fetch('data/processed/explorer.json')
+fetch('data/processed/explorer.json?v=' + Date.now())
   .then(r => r.json())
   .then(d => { RAW = d; initExplorer(); })
   .catch(e => console.error('Data load error:', e));

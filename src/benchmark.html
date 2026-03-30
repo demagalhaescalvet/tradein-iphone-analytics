@@ -132,7 +132,7 @@ svg { font-family:'DM Sans',-apple-system,sans-serif; }
 <script>
 let RAW = null;
 
-fetch('data/processed/benchmark.json')
+fetch('data/processed/benchmark.json?v=' + Date.now())
   .then(r => r.json())
   .then(d => { RAW = d; initBenchmark(); })
   .catch(e => console.error('Data load error:', e));
